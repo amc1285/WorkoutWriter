@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --bg:#F1F5F7; --bg-soft:#F7FAFB; --surface:#FFFFFF; --ink:#13273A; --muted:#5A6E7D;
@@ -98,10 +99,11 @@ label.f input,label.f select{color:var(--ink);font-size:16px}
 .kv span{font-size:13px;color:var(--muted)}
 .sp-card h3{font-size:15px;color:var(--muted);font-weight:500;margin-bottom:8px}
 .bd + .bd{margin-top:16px}
-.bar-row{display:grid;grid-template-columns:76px minmax(0,1fr) 78px;gap:8px;align-items:center;font-size:14px;padding:2px 0}
+.bar-row{display:grid;grid-template-columns:112px minmax(0,1fr) 78px;gap:8px;align-items:center;font-size:14px;padding:2px 0}
 .bar{height:10px;background:var(--bg);border:1px solid var(--line);border-radius:2px;overflow:hidden}
 .bar i{display:block;height:100%}
 .bar-row .v{text-align:right;font-variant-numeric:tabular-nums}
+.bar-row > span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-row .v em{font-style:normal;color:var(--muted);font-size:12px;margin-left:4px}
 .cols{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end}
 .col{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
@@ -163,6 +165,22 @@ label.f input,label.f select{color:var(--ink);font-size:16px}
   .gh{padding-left:0}.gh button.act{width:96px}
   .mirror,.ta{font-size:14px}
 }
+.subtabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.subtabs button{background:none;border:0;padding:10px 16px;cursor:pointer;color:var(--muted);font-weight:500;letter-spacing:.02em;border-bottom:3px solid transparent}
+.subtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--aqua)}
+.tagpage{padding:16px 20px 20px}
+.tagpage p.help{margin:0 0 12px;color:var(--muted);font-size:15px;max-width:70ch}
+.tester{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;padding:12px 14px;background:var(--bg-soft);border:1px solid var(--line);border-radius:6px}
+.tester input{width:100%;font-size:16px}
+.tester .out{font-size:15px;min-height:22px}
+.tagtable{width:100%;border-collapse:collapse}
+.tagtable th{text-align:left;font-size:12px;font-weight:500;color:var(--muted);padding:0 8px 4px 0}
+.tagtable td{padding:4px 8px 4px 0;vertical-align:middle}
+.tagtable input{width:100%}
+.tagtable input.t-val{width:68px}
+.tagtable .sw{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle}
+.tagactions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+@media (max-width:760px){.tagtable thead{display:none}.tagtable tr{display:grid;grid-template-columns:1fr auto;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.tagtable td:nth-child(2){grid-column:1 / -1}}
 details.help{margin-top:12px;padding:10px 14px}
 .selcard{margin-top:12px;padding:12px 16px}
 .sel-h{font-size:13px;color:var(--muted);margin-bottom:8px}
@@ -172,7 +190,30 @@ details.help{margin-top:12px;padding:10px 14px}
 .sel-grid em{font-style:normal;color:var(--muted)}
 details.help summary{cursor:pointer;color:var(--muted)}
 details.help pre{margin:10px 0 0;font:13px/1.55 var(--f-mono);white-space:pre-wrap;color:var(--ink)}
-.grp-note{font-size:13px;color:var(--muted);margin-top:8px}
+.grp-note{font-size:13px;color:var(--muted);margin:8px 0 0}
+.meta2{margin-top:-4px}
+.f.gp{flex:1;min-width:260px}
+.gchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:34px}
+.gchips #gchips{display:contents}
+.medrow{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:14px}
+.medrow b{font-size:22px}
+.grp-table th{font-size:12px;font-weight:500;color:var(--muted);text-align:right;padding-bottom:4px}
+.grp-table th:first-child{text-align:left}
+.grp-table tr.mini td{padding:0 0 8px;border-top:0}
+.grp-table .dl{display:block;font-style:normal;font-size:12px;color:var(--muted);line-height:1.1}
+.grp-table .dl.off{color:var(--amber);font-weight:600}
+.ibar{display:flex;height:6px;border-radius:2px;overflow:hidden;background:var(--bg)}
+.ibar i{display:block;min-width:2px}
+.notes{width:100%;margin-top:10px;font:15px/1.4 var(--f-ui);padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface);resize:vertical}
+.paces{font-size:18px!important;line-height:1.15!important}
+label.chk{display:flex;gap:8px;align-items:center;font-size:16px;color:var(--ink)}
+dialog{max-height:calc(100vh - 28px);overflow:auto}
+.dlg .msg{margin:0;font-size:14px;color:var(--muted);min-height:20px}
+.dlg .msg a{color:var(--aqua-ink)}
+.dlg textarea{width:100%;font:15px/1.4 var(--f-ui);padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface)}
+.dlg details{font-size:14px;color:var(--muted)}
+.dlg details ol{margin:8px 0 0;padding-left:20px;line-height:1.5}
+.dlg .cbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px}
 
 /* search */
 .sr-row{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;padding:12px 14px;align-items:center;border-top:1px solid var(--line)}
@@ -220,6 +261,7 @@ dialog::backdrop{background:rgba(8,18,26,.55)}
   <nav aria-label="Main">
     <a href="#/week" id="nav-week">Week</a>
     <a href="#/search" id="nav-search">Search</a>
+    <a href="#/tags" id="nav-tags">Strokes &amp; intensity</a>
     <button type="button" id="btn-settings">Settings &amp; backup</button>
   </nav>
   <span id="status" class="status" role="status"></span>
@@ -260,50 +302,102 @@ const parseIntervalStr = s => {
   if (/^\d+$/.test(s)) return +s;
   return null;
 };
-const round25 = v => Math.round(v / 25) * 25;
+const round25 = v => Math.round(v / 12.5) * 12.5;   // Commit rounds timed-swim estimates to half a length
 
-/* ---------- tagging (stroke / type / intensity / equipment) ---------- */
-const DIM = {
+/* ---------- tagging vocabulary (editable on the Tags page) ---------- */
+/* words: comma separated things you write in a workout; val: intensity level 1-12 (higher wins ties) */
+const DEFAULT_VOCAB = {
+  intensity: [
+    { name: 'Rest', words: 'rest', val: 1 },
+    { name: 'Easy', words: 'easy, ez', val: 2 },
+    { name: 'Drill', words: '', val: 2 },
+    { name: 'Warm up', words: 'warm up, warmup, wu', val: 2 },
+    { name: 'Cool down', words: 'cool down, cooldown, cd', val: 2 },
+    { name: 'Recovery', words: 'recovery, rec', val: 2 },
+    { name: 'Loosen', words: 'loosen, relax', val: 2 },
+    { name: 'Aerobic', words: 'aerobic, en1', val: 4 },
+    { name: 'JMI', words: 'jmi, just make the interval', val: 5 },
+    { name: 'Build', words: 'build, builds, bld, descend, negative split', val: 5 },
+    { name: 'Moderate', words: 'moderate, mod, steady, strong', val: 5 },
+    { name: 'Dryland', words: 'dryland', val: 7 },
+    { name: 'Hypo', words: 'hypo', val: 7 },
+    { name: 'Aerobic Endurance', words: 'en2', val: 7 },
+    { name: 'Fast', words: 'fast, fst, race, racing, explosive, burst', val: 8 },
+    { name: 'Sprint', words: 'sprint, sprints, spr', val: 8 },
+    { name: 'Mix EN2/EN3', words: 'en2 en3, mix aerobic anaerobic', val: 8 },
+    { name: 'Pace', words: 'pace, threshold, goal', val: 9 },
+    { name: '500 Pace', words: 'p500, 500 pace', val: 9 },
+    { name: '200 Pace', words: 'p200, 200 pace', val: 10 },
+    { name: 'FPA', words: 'fpa, fastest possible average', val: 10 },
+    { name: '100 Pace', words: 'p100, 100 pace', val: 10 },
+    { name: 'Anaerobic', words: 'en3, anaerobic', val: 10 },
+    { name: 'OTB', words: 'otb, off the blocks', val: 12 },
+    { name: 'All Out', words: 'all out, allout, ao', val: 12 },
+    { name: 'Race Pace', words: 'race pace, rp', val: 12 },
+    { name: 'AFAP', words: 'afap, as fast as possible', val: 12 }
+  ],
   stroke: [
-    ['Free',  'free|freestyle|fr|crawl'],
-    ['Back',  'back|backstroke|bk'],
-    ['Breast','breast|breaststroke|br'],
-    ['Fly',   'fly|butterfly|fl'],
-    ['IM',    'im|jmi|medley'],
-    ['Choice','choice|any stroke|your stroke']
+    { name: 'Free', words: 'free, freestyle, fr, crawl' },
+    { name: 'Back', words: 'back, backstroke, bk' },
+    { name: 'Breast', words: 'breast, breaststroke, br' },
+    { name: 'Fly', words: 'fly, butterfly, fl' },
+    { name: 'IM', words: 'im, medley' },
+    { name: 'Choice', words: 'choice, ch, any stroke, your stroke' },
+    { name: 'Mix', words: 'mx' },
+    { name: 'Stroke', words: 'str' },
+    { name: 'Worst', words: 'worst, wrst' },
+    { name: 'FRIM', words: 'frim' }
   ],
   type: [
-    ['Swim','swim|swims|swimming'],
-    ['Kick','kick|kicks|kicking|kb'],
-    ['Drill','drill|drills'],
-    ['Pull','pull|paddles?|buoy']
-  ],
-  intensity: [
-    ['Pace','pace|threshold|goal'],
-    ['Sprint','sprint|sprints|all[- ]?out|max'],
-    ['Fast','fast|race|racing|explosive|burst'],
-    ['Build','build|builds|descend|negative split'],
-    ['Moderate','mod|moderate|steady|aerobic|strong'],
-    ['Easy','ez|easy|recovery|relax|loosen|cool[- ]?down|warm[- ]?up']
+    { name: 'Swim', words: 'swim, swims, swimming' },
+    { name: 'Kick', words: 'kick, kicks, kicking, kb, dolphin, dolphins, dk, flutter' },
+    { name: 'Pull', words: 'pull, pulls, paddle, paddles, buoy, buoys' },
+    { name: 'Drill', words: 'drill, drills, dr' },
+    { name: 'Mix', words: 'mx' },
+    { name: 'Dryland', words: 'dryland, dl' }
   ],
   equip: [
-    ['Paddles','paddles?'], ['Buoys','buoys?|pull'], ['Fins','fins?'], ['Snorkels','snorkels?'],
-    ['Boards','kickboards?|boards?'], ['Zoomers','zoomers?'], ['Bands','bands?'], ['Buckets','buckets?'], ['Tubes','tubes?']
+    { name: 'Paddles', words: 'paddle, paddles' },
+    { name: 'Buoys', words: 'buoy, buoys, pull' },
+    { name: 'Fins', words: 'fin, fins' },
+    { name: 'Snorkels', words: 'snorkel, snorkels' },
+    { name: 'Kickboard', words: 'kickboard, kickboards, board, boards' },
+    { name: 'Zoomers', words: 'zoomer, zoomers' },
+    { name: 'Bands', words: 'band, bands' },
+    { name: 'Buckets', words: 'bucket, buckets' },
+    { name: 'Tubes', words: 'tube, tubes' },
+    { name: 'Sneakers', words: 'sneakers, shoes' },
+    { name: 'T-shirts', words: 'tshirt, tshirts, t-shirt, shirts' },
+    { name: 'Paddleheads', words: 'paddlehead, paddleheads, ph' },
+    { name: 'Parachute', words: 'parachute, parachutes, chute, chutes' },
+    { name: 'Tempo Trainers', words: 'tempo trainer, tempo trainers, tt, tts' }
   ]
 };
-const ORDER = {
-  stroke: ['Free','Back','Breast','Fly','IM','Choice'],
-  type: ['Swim','Kick','Drill','Pull'],
-  intensity: ['Easy','Moderate','Build','Pace','Fast','Sprint'],
-  equip: ['Paddles','Buoys','Fins','Snorkels','Boards','Zoomers','Bands','Buckets','Tubes']
-};
-const COLORS = {
-  stroke: {Free:'#2F6FB5',Back:'#7A5BC4',Breast:'#2E8B57',Fly:'#C9488A',IM:'#D99A00',Choice:'#7D8F9B'},
-  type: {Swim:'#0E8794',Kick:'#E4752B',Drill:'#7A5BC4',Pull:'#2E8B57'},
-  intensity: {Easy:'#9ACFD9',Moderate:'#4FA3B5',Build:'#D99A00',Pace:'#E4752B',Fast:'#C23B2B',Sprint:'#8E1B12'},
-  equip: Object.fromEntries(['Paddles','Buoys','Fins','Snorkels','Boards','Zoomers','Bands','Buckets','Tubes'].map(k => [k, '#A0643C']))
-};
+const DIM = {}, ORDER = {}, COLORS = {}, INT_VAL = {};
+const PALETTE = ['#2F6FB5', '#7A5BC4', '#2E8B57', '#C9488A', '#D99A00', '#7D8F9B', '#0E8794', '#E4752B', '#8E6CC9', '#B5523B'];
+const intColor = v => `hsl(${Math.round(190 - (Math.min(12, Math.max(1, v)) - 1) * 16.8)},60%,${Math.round(72 - (Math.min(12, Math.max(1, v)) - 1) * 3.2)}%)`;
 const DIMS = ['stroke', 'type', 'intensity', 'equip'];
+const DEFAULT_DFLT = { stroke: 'Free', type: 'Swim', intensity: 'Moderate' };
+function wordsToSrc(words) {
+  return String(words || '').split(/[,;\n]/).map(w => w.trim().replace(/[-\s]+/g, ' ')).filter(Boolean)
+    .map(w => w.split(' ').map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[- ]?')).join('|');
+}
+function applyVocab(v) {
+  v = v || DEFAULT_VOCAB;
+  const clean = list => (Array.isArray(list) ? list : []).filter(e => e && String(e.name || '').trim()).map(e => Object.assign({}, e, { name: String(e.name).trim() }));
+  const ints = clean(v.intensity).map((e, i) => Object.assign(e, { val: Math.min(12, Math.max(1, +e.val || 5)), i }));
+  DIM.intensity = ints.slice().sort((a, b) => b.val - a.val || a.i - b.i).filter(e => wordsToSrc(e.words)).map(e => [e.name, wordsToSrc(e.words)]);
+  ORDER.intensity = ints.slice().sort((a, b) => a.val - b.val || a.i - b.i).map(e => e.name);
+  for (const k of Object.keys(INT_VAL)) delete INT_VAL[k];
+  COLORS.intensity = {}; ints.forEach(e => { INT_VAL[e.name] = e.val; COLORS.intensity[e.name] = intColor(e.val); });
+  for (const kind of ['stroke', 'type', 'equip']) {
+    const list = clean(v[kind]);
+    DIM[kind] = list.filter(e => wordsToSrc(e.words)).map(e => [e.name, wordsToSrc(e.words)]);
+    ORDER[kind] = list.map(e => e.name);
+    COLORS[kind] = {}; list.forEach((e, i) => { COLORS[kind][e.name] = kind === 'equip' ? '#A0643C' : PALETTE[i % PALETTE.length]; });
+  }
+}
+applyVocab(DEFAULT_VOCAB);
 
 function expandAbbr(s) {
   const M = { k: 'kick', d: 'drill', s: 'swim', p: 'pull' };
@@ -312,15 +406,16 @@ function expandAbbr(s) {
 function distribute(desc, defs, mode) {
   const hits = [];
   for (const [name, src] of defs) {
-    if (new RegExp('\\b(?:' + src + ')\\b', 'i').test(desc)) {
+    const mm = desc.match(new RegExp('\\b(?:' + src + ')\\b', 'i'));
+    if (mm) {
       const w = desc.match(new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:yds?|yards?|y|m)?\\s*(?:' + src + ')\\b', 'i'));
-      hits.push({ name, w: w ? parseFloat(w[1]) : null });
+      hits.push({ name, w: w ? parseFloat(w[1]) : null, len: mm[0].length });
     }
   }
   if (!hits.length) return null;
   const allW = hits.length > 1 && hits.every(h => h.w);
   if (allW) { const s = hits.reduce((a, h) => a + h.w, 0); return hits.map(h => [h.name, h.w / s]); }
-  if (mode === 'priority') return [[hits[0].name, 1]];
+  if (mode === 'priority') { const best = hits.slice().sort((a, b) => b.len - a.len)[0]; return [[best.name, 1]]; }   // "race pace" beats "race"
   return hits.map(h => [h.name, 1 / hits.length]);
 }
 function tagParts(desc) {
@@ -331,14 +426,15 @@ function tagParts(desc) {
 }
 const newStats = () => ({ stroke: {}, type: {}, intensity: {}, equip: {} });
 function mergeStats(a, b) { for (const k of DIMS) for (const n in b[k]) a[k][n] = (a[k][n] || 0) + b[k][n]; }
-function tagInto(stats, y, desc, ctxs, easy) {
+function tagInto(stats, y, desc, ctxs, easy, dflt) {
   const t = tagParts(desc);
   for (const c of ctxs) {
     if (DIMS.every(k => t[k])) break;
     const cp = tagParts(c); for (const k of DIMS) if (!t[k]) t[k] = cp[k];
   }
-  const st = t.stroke || [['Free', 1]], ty = t.type || [['Swim', 1]];
-  const it = t.intensity || [[(easy || (ty.length === 1 && ty[0][0] === 'Drill')) ? 'Easy' : 'Moderate', 1]];
+  const D = dflt || DEFAULT_DFLT;
+  const st = t.stroke || [[D.stroke, 1]], ty = t.type || [[D.type, 1]];
+  const it = t.intensity || [[(easy || (ty.length === 1 && ty[0][0] === 'Drill')) ? 'Easy' : D.intensity, 1]];
   for (const [k, f] of st) stats.stroke[k] = (stats.stroke[k] || 0) + y * f;
   for (const [k, f] of ty) stats.type[k] = (stats.type[k] || 0) + y * f;
   for (const [k, f] of it) stats.intensity[k] = (stats.intensity[k] || 0) + y * f;
@@ -418,8 +514,8 @@ function classify(line) {
   if ((m = a.match(/^:(\d{2})(?!\d)\s*(.*)$/)))            return Object.assign(base, { kind: 'time', secs: +m[1], desc: (m[2] + ' ' + ptext).trim() });
   if ((m = a.match(/^(\d+(?:\.\d+)?)\s*(min|mins|minutes?|sec|secs|seconds?)\b\.?\s*(.*)$/i)))
     return Object.assign(base, { kind: 'time', secs: /^m/i.test(m[2]) ? +m[1] * 60 : +m[1], desc: (m[3] + ' ' + ptext).trim() });
-  if ((m = a.match(/^(\d+)\s*[xX]\s*(\d+(?:\.\d+)?)(.*)$/))) return mkSet(base, +m[1], +m[2], m[3], ptext);
-  if ((m = a.match(/^(\d+)\s*[xX]\s*(?!\d)(.*)$/)))        return Object.assign(base, { kind: 'round', mult: +m[1], desc: m[2], ctxText: (m[2] + ' ' + ptext).trim() });
+  if ((m = a.match(/^(\d+)\s*[xX]\.?\s*(\d+(?:\.\d+)?)(?![\d:])(.*)$/))) return mkSet(base, +m[1], +m[2], m[3], ptext);
+  if ((m = a.match(/^(\d+)\s*[xX](?!\.?\s*\d)\s*(.*)$/)))        return Object.assign(base, { kind: 'round', mult: +m[1], desc: m[2], ctxText: (m[2] + ' ' + ptext).trim() });
   if ((m = a.match(/^(\d+)\s*(?:rounds?|times)\b\s*(.*)$/i))) return Object.assign(base, { kind: 'round', mult: +m[1], desc: m[2], ctxText: (m[2] + ' ' + ptext).trim() });
   if ((m = a.match(/^(\d+(?:\.\d+)?)\s*(?:yds?|yards?|meters?|m|y)?(?![\w.:])\s*[-–:]?\s*(.*)$/i))) {
     const f = findInterval(m[2]);
@@ -428,7 +524,7 @@ function classify(line) {
     }
     return Object.assign(base, { kind: 'dist', dist: +m[1], desc: (m[2] + ' ' + ptext).trim() });
   }
-  if ((m = a.match(/^(.*?)(?:^|[\s:;,–-])(\d+)\s*[xX]\s*(\d+(?:\.\d+)?)(?!\d)(.*)$/)))
+  if ((m = a.match(/^(.*?)(?:^|[\s:;,–-])(\d+)\s*[xX]\.?\s*(\d+(?:\.\d+)?)(?![\d:])(.*)$/)))
     return mkSet(base, +m[2], +m[3], m[4], (m[1] + ' ' + ptext).trim());
   return Object.assign(base, { kind: 'text', ctxText: (a + ' ' + ptext).trim() });
 }
@@ -489,15 +585,16 @@ function evalWorkout(parsed, key, W) {
           else one = L.dist / 100 * W.defSec;
           const y = sg.n * L.dist * mult;
           ly += y; ls += sg.n * one * mult; baseSecs += sg.n * one;
-          if (L.cycle) cycleSlices(L.dist, L.cycle.pairs).forEach(s => tagInto(lst, s.y * sg.n * mult, s.word, [sg.desc].concat(ctxs), easy));
-          else tagInto(lst, y, sg.desc, ctxs, easy);
+          if (L.cycle) cycleSlices(L.dist, L.cycle.pairs).forEach(s => tagInto(lst, s.y * sg.n * mult, s.word, [sg.desc].concat(ctxs), easy, W.dflt));
+          else tagInto(lst, y, sg.desc, ctxs, easy, W.dflt);
         }
-        lastBase = baseSecs; frame.counted = true;
+        lastBase = baseSecs; frame.counted = (L.kind === 'set');     // a bare "500 Pace" can head a block of sets
       } else if (L.kind === 'time') {
         ls = L.secs * mult;
-        if (!RESTISH.test(L.desc) && SWIMMY.test(L.desc)) {
+        const tp = tagParts(L.desc);
+        if (!RESTISH.test(L.desc) && (SWIMMY.test(L.desc) || tp.stroke || tp.type || tp.intensity)) {
           ly = round25(L.secs / W.defSec * 100) * mult; lastBase = L.secs;
-          frame.counted = true; tagInto(lst, ly, L.desc, ctxs, easy);
+          frame.counted = true; tagInto(lst, ly, L.desc, ctxs, easy, W.dflt);
         }
       } else if (L.kind === 'text') {
         if (/^partner(?:'?s)?\s+(?:swims?|goes|go)\b/i.test(L.a)) ls = lastBase * mult;
@@ -506,7 +603,7 @@ function evalWorkout(parsed, key, W) {
     }
     stack.push(frame);
     yds += ly; secs += ls; mergeStats(stats, lst);
-    per[idx] = { applies: true, ly, ls, note, cumY: yds, cumS: secs, st: lst };
+    per[idx] = { applies: true, ly, ls, note, mult, cumY: yds, cumS: secs, st: lst };
   });
   const idxs = parsed.map((_, i) => i).filter(i => per[i].applies && !per[i].blank);
   const rootIndent = Math.min(99, ...idxs.filter(i => !per[i].hdr && parsed[i].base == null).map(i => parsed[i].indent));
@@ -521,16 +618,27 @@ function evalWorkout(parsed, key, W) {
 function analyze(w) {
   const parsed = parseText(w.text || '');
   const seen = new Map();
+  (w.groups || []).forEach(n => { const k = String(n).toLowerCase(); if (k && !seen.has(k)) seen.set(k, n); });
   parsed.forEach(L => { if (L.kind === 'group' && L.groups) L.groups.forEach(n => { const k = n.toLowerCase(); if (!seen.has(k)) seen.set(k, n); }); });
-  const W = { defSec: w.defSec || 90, startSec: timeToSec(w.time) };
+  const safe = (list, name, fb) => list.includes(name) ? name : (list.includes(fb) ? fb : (list[0] || fb));
+  const dflt = { stroke: safe(ORDER.stroke, w.defStroke, 'Free'), type: safe(ORDER.type, w.defType, 'Swim'), intensity: safe(ORDER.intensity, w.defInt, 'Moderate') };
+  const W = { defSec: w.defSec || 90, startSec: timeToSec(w.time), dflt };
   const keys = seen.size ? [...seen.keys()] : ['*'];
   const items = keys.map(k => ({ key: k, name: k === '*' ? null : seen.get(k), res: evalWorkout(parsed, k, W) }));
   const rootIndent = Math.min(99, ...parsed.filter(L => L.kind !== 'blank' && L.kind !== 'group' && L.base == null).map(L => L.indent));
   return { parsed, items, hasGroups: seen.size > 0, W, rootIndent };
 }
+const median = arr => { const a = [...arr].sort((x, y) => x - y), n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : 0; };
+/* the number used for day / week totals: median of the groups unless a group (or 'max') is chosen */
 function pick(A, sel) {
   if (!A.hasGroups) return A.items[0].res;
-  if (!sel || sel === 'max') return A.items.reduce((b, i) => i.res.yds > b.yds ? i.res : b, A.items[0].res);
+  if (!sel || sel === 'median') {
+    const ys = A.items.map(i => i.res.yds), my = median(ys);
+    const near = A.items.reduce((b, i) => Math.abs(i.res.yds - my) < Math.abs(b.res.yds - my) ? i : b, A.items[0]);
+    const ms = median(A.items.map(i => i.res.secs));
+    return Object.assign({}, near.res, { yds: my, secs: ms, end: A.W.startSec + ms });
+  }
+  if (sel === 'max') return A.items.reduce((b, i) => i.res.yds > b.yds ? i.res : b, A.items[0].res);
   const it = A.items.find(i => i.key === sel);
   return it ? it.res : evalWorkout(A.parsed, sel, A.W);
 }
@@ -541,34 +649,50 @@ function groupNamesIn(text) {
   });
   return out;
 }
-/* the block (a line plus the lines indented under it) that contains line idx */
+/* the line at idx plus the lines indented under it */
 function blockRange(A, idx) {
   const P = A.parsed, L = P[idx];
   if (!L || L.kind === 'blank') return null;
   if (L.kind === 'group') { let e = idx; while (e + 1 < P.length && P[e + 1].secId === L.secId) e++; while (e > idx && P[e].kind === 'blank') e--; return [idx, e]; }
-  const rootOf = l => l.base != null ? l.base : A.rootIndent;
-  const child = l => l.kind === 'blank' || (l.kind !== 'group' && l.indent > rootOf(l));
-  let s = idx; while (s > 0 && child(P[s])) s--;
-  if (P[s].kind === 'group') s++;
-  let e = s; while (e + 1 < P.length && child(P[e + 1])) e++;
-  while (e > s && P[e].kind === 'blank') e--;
-  return [s, e];
+  let e = idx;
+  for (let j = idx + 1; j < P.length; j++) {
+    if (P[j].kind === 'blank') continue;
+    if (P[j].kind === 'group' || P[j].indent <= L.indent) break;
+    e = j;
+  }
+  return [idx, e];
 }
-function summarize(res, from, to) {
-  const out = { yds: 0, secs: 0, stats: newStats() };
-  for (let i = from; i <= to; i++) { const p = res.per[i]; if (p && p.applies && !p.blank && !p.hdr && !p.note) { out.yds += p.ly; out.secs += p.ls; if (p.st) mergeStats(out.stats, p.st); } }
+/* totals for lines from..to; with ownScale the multipliers of the lines above `from` are left out */
+function summarize(res, from, to, ownScale) {
+  const out = { yds: 0, secs: 0, stats: newStats(), paces: [] };
+  const p0 = res.per[from];
+  const k = (ownScale && p0 && p0.mult) ? 1 / p0.mult : 1;
+  for (let i = from; i <= to; i++) {
+    const p = res.per[i];
+    if (p && p.applies && !p.blank && !p.hdr && !p.note) {
+      out.yds += p.ly * k; out.secs += p.ls * k;
+      if (p.st) { const t = newStats(); mergeStats(t, p.st); for (const d of DIMS) for (const n in t[d]) t[d][n] *= k; mergeStats(out.stats, t); }
+      if (p.ly > 0 && p.ls > 0) { const pc = Math.round(p.ls / p.ly * 100); if (!out.paces.includes(pc)) out.paces.push(pc); }
+    }
+  }
   return out;
 }
 /*CORE-END*/
 
 /* ---------- storage ---------- */
+const BUILD = 'Pool Deck build 2026-10-23 (editable strokes & intensities)';
 const KEY = 'pooldeck.v1';
-const defSettings = () => ({ weekStart: 1, defSec: 90, unit: 'yards', pool: 25, startTime: '15:30', seeded: false, weekGroup: 'max' });
+const defSettings = () => ({ v: 3, weekStart: 1, defSec: 90, unit: 'yards', pool: 25, startTime: '15:30', seeded: false, weekGroup: 'median',
+  groupList: ['100s', '200Free', '200im', '500free', '50Free', '50and100free', 'Alternates', 'Autos', 'Metro', 'NonAutos', 'State', 'Varsity'],
+  gClientId: '', gFolderName: 'Pool Deck PDFs', gFolderId: '', pdfOpts: { metrics: true, zero: false, notes: true } });
 let db, storageOK = true, saveTimer = null;
 function loadDB() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) { const d = JSON.parse(raw); return { workouts: d.workouts || {}, groupColors: d.groupColors || {}, settings: Object.assign(defSettings(), d.settings) }; }
+    if (raw) { const d = JSON.parse(raw); const st = Object.assign(defSettings(), d.settings);
+      if (!d.settings || d.settings.v !== 3) st.weekGroup = 'median';
+      st.v = 3; st.pdfOpts = Object.assign({ metrics: true, zero: false, notes: true }, st.pdfOpts);
+      return { workouts: d.workouts || {}, groupColors: d.groupColors || {}, settings: st }; }
   } catch (e) { storageOK = false; }
   return { workouts: {}, groupColors: {}, settings: defSettings() };
 }
@@ -678,8 +802,10 @@ function route() {
   const [r, arg] = location.hash.replace(/^#\/?/, '').split('/');
   document.getElementById('nav-week').removeAttribute('aria-current');
   document.getElementById('nav-search').removeAttribute('aria-current');
+  document.getElementById('nav-tags').removeAttribute('aria-current');
   window.scrollTo(0, 0);
   if (r === 'edit' && db.workouts[arg]) { renderEditor(db.workouts[arg]); return; }
+  if (r === 'tags') { document.getElementById('nav-tags').setAttribute('aria-current', 'page'); renderTags(['intensity', 'stroke', 'type', 'equip'].includes(arg) ? arg : 'intensity'); return; }
   if (r === 'search') { document.getElementById('nav-search').setAttribute('aria-current', 'page'); renderSearch(); return; }
   document.getElementById('nav-week').setAttribute('aria-current', 'page');
   const d = /^\d{4}-\d{2}-\d{2}$/.test(arg || '') ? arg : todayStr();
@@ -688,7 +814,7 @@ function route() {
 
 /* ---------- week view ---------- */
 function renderWeek(ws) {
-  const S = db.settings, sel = S.weekGroup || 'max', ua = unitAbbr(S.unit);
+  const S = db.settings, sel = S.weekGroup || 'median', ua = unitAbbr(S.unit);
   const days = [...Array(7)].map((_, i) => addDays(ws, i));
   const data = days.map(d => {
     const items = workoutsOn(d).map(w => { const A = analyze(w); return { w, A, r: pick(A, sel) }; });
@@ -703,7 +829,7 @@ function renderWeek(ws) {
   const a = pdate(ws), b = pdate(addDays(ws, 6));
   const range = a.getMonth() === b.getMonth() ? `${MON[a.getMonth()]} ${a.getDate()} – ${b.getDate()}` : `${MON[a.getMonth()]} ${a.getDate()} – ${MON[b.getMonth()]} ${b.getDate()}`;
   const groups = allGroups();
-  const selName = sel === 'max' ? null : (groups.find(g => g.key === sel) || {}).name;
+  const selName = !groups.length ? null : sel === 'median' ? 'median of groups' : sel === 'max' ? 'largest group' : (groups.find(g => g.key === sel) || {}).name;
   const maxY = Math.max(1, ...data.map(d => d.yds));
   const t = todayStr();
 
@@ -715,7 +841,7 @@ function renderWeek(ws) {
     <button class="btn" data-act="thisweek">This week</button>
     <span class="sp"></span>
     ${groups.length ? `<label class="f" style="flex-direction:row;align-items:center;gap:8px">Totals for
-      <select id="wkgroup"><option value="max">Largest group</option>${groups.map(g => `<option value="${esc(g.key)}"${g.key === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>` : ''}
+      <select id="wkgroup"><option value="median"${sel === 'median' ? ' selected' : ''}>Median of groups</option><option value="max"${sel === 'max' ? ' selected' : ''}>Largest group</option>${groups.map(g => `<option value="${esc(g.key)}"${g.key === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>` : ''}
     <button class="btn" data-act="copyweek"${count ? '' : ' disabled'}>Copy week to next week</button>
   </div>
   <div class="two">
@@ -727,19 +853,19 @@ function renderWeek(ws) {
           ${d.items.length ? d.items.map(x => `
             <button class="prac" data-act="open" data-id="${x.w.id}">
               <span class="pt"><span>${fmtClock(timeToSec(x.w.time))}</span>${esc(x.w.title || 'Untitled practice')}</span>
-              <span class="py">${(() => { if (!(x.A.hasGroups && sel === 'max')) return fmtNum(x.r.yds); const ys = x.A.items.map(i => i.res.yds), mn = Math.min(...ys), mx = Math.max(...ys); return mn === mx ? fmtNum(mx) : fmtNum(mn) + '–' + fmtNum(mx); })()}</span>
+              <span class="py">${fmtNum(Math.round(x.r.yds))}</span>
               ${x.A.hasGroups ? `<span class="pc">${x.A.items.map(it => `<span class="chip" style="--gc:${colorFor(it.name)}">${esc(it.name)} ${fmtNum(it.res.yds)}</span>`).join('')}</span>` : ''}
             </button>`).join('') : '<div class="restday">No practice</div>'}
           <div class="addrow"><button class="btn sm" data-act="add" data-date="${d.date}">+ Add practice</button></div>
         </div>
-        <div class="dt"><span class="num">${d.yds ? fmtNum(d.yds) : '–'}</span><small>${d.yds ? `${ua} · ${fmtDur(d.secs)}` : 'day total'}</small></div>
+        <div class="dt"><span class="num">${d.yds ? fmtNum(Math.round(d.yds)) : '–'}</span><small>${d.yds ? `${ua} · ${fmtDur(d.secs)}` : 'day total'}</small></div>
       </section>`).join('')}
     </div>
     <aside class="side" aria-label="Week summary">
       <div class="card sp-card">
         <h3>Week total${selName ? ' · ' + esc(selName) : ''}</h3>
-        <div class="big">${fmtNum(wYds)}<small>${ua}</small></div>
-        <div class="kv"><div><b>${fmtDur(wSecs)}</b><span>in the water (est.)</span></div><div><b>${count}</b><span>${count === 1 ? 'practice' : 'practices'}</span></div><div><b>${fmtNum(monthYds)}</b><span>${MONL[mDate.getMonth()]} total</span></div></div>
+        <div class="big">${fmtNum(Math.round(wYds))}<small>${ua}</small></div>
+        <div class="kv"><div><b>${fmtDur(wSecs)}</b><span>in the water (est.)</span></div><div><b>${count}</b><span>${count === 1 ? 'practice' : 'practices'}</span></div><div><b>${fmtNum(Math.round(monthYds))}</b><span>${MONL[mDate.getMonth()]} total</span></div></div>
       </div>
       <div class="card sp-card"><h3>${S.unit === 'meters' ? 'Meters' : 'Yards'} by day</h3>
         <div class="cols">${data.map(d => `<div class="col"><div class="cv">${d.yds ? fmtNum(d.yds) : ''}</div><div class="cb"><i style="height:${(d.yds / maxY * 100).toFixed(1)}%"></i></div><div class="cl">${DOW[pdate(d.date).getDay()]}</div></div>`).join('')}</div>
@@ -790,6 +916,7 @@ Kick set                 a header's words (kick, pull, easy…) tag its lines
   200 easy
 Partner swims            adds the previous set's time, no yards
 [notes in brackets]      ignored completely; (parentheses) can add tags
+dolphin / streamline kick, DK  count as kick (edit all word lists under Strokes & intensity)
 #Sprint, Distance        lines indented under it belong to those groups
   6x50 fast              (or write flat lines and finish with #All)`;
 
@@ -807,14 +934,14 @@ function hl(raw) {
 }
 
 function selHTML(sm, label, groupName, ua) {
-  const pace = sm.yds > 0 && sm.secs > 0 ? fmtMS(sm.secs / sm.yds * 100) : '–';
+  const pace = sm.paces && sm.paces.length ? sm.paces.slice(0, 3).map(fmtMS).join('<br>') : '–';
   const col = (title, map, kind) => {
     const rows = ORDER[kind].filter(k => map[k] > 0.01).map(k => `<div style="color:color-mix(in srgb,${COLORS[kind][k]} 72%,var(--ink))">${k}: ${fmtNum(map[k])}</div>`).join('');
     return `<div><span>${title}</span>${rows || '<div class="muted">–</div>'}</div>`;
   };
   const eq = Object.values(sm.stats.equip).some(v => v > 0.01) ? col('Equipment', sm.stats.equip, 'equip') : '';
   return `<div class="sel-h">${label}${groupName ? ' · ' + esc(groupName) : ''}</div>
-    <div class="sel-grid"><div><span>Distance &amp; time</span><b>${fmtNum(sm.yds)} ${ua}</b><em>${fmtMS(sm.secs)}</em></div><div><span>100 pace</span><b>${pace}</b></div>
+    <div class="sel-grid"><div><span>Distance &amp; time</span><b>${fmtNum(sm.yds)} ${ua}</b><em>${fmtMS(sm.secs)}</em></div><div><span>100 pace</span><b class="paces">${pace}</b></div>
     ${col('Strokes', sm.stats.stroke, 'stroke')}${col('Types', sm.stats.type, 'type')}${col('Intensity', sm.stats.intensity, 'intensity')}${eq}</div>`;
 }
 function renderEditor(w) {
@@ -826,7 +953,7 @@ function renderEditor(w) {
     <a class="btn" href="#/week/${w.date}">‹ Week</a>
     <input type="text" class="title" id="f-title" placeholder="Practice title" aria-label="Practice title" value="${esc(w.title)}">
     <button class="btn" id="b-copy">Copy to date…</button>
-    <button class="btn" id="b-print">Print / PDF</button>
+    <button class="btn" id="b-print">Save / print…</button>
     <button class="btn danger" id="b-del">Delete</button>
   </div>
   <div class="meta">
@@ -834,6 +961,12 @@ function renderEditor(w) {
     <label class="f">Start time<input type="time" id="f-time" value="${esc(w.time || '15:30')}"></label>
     <label class="f">Pool<span class="pool"><input type="number" id="f-pool" min="1" value="${w.pool || 25}"><select id="f-unit"><option value="yards"${w.unit !== 'meters' ? ' selected' : ''}>yards</option><option value="meters"${w.unit === 'meters' ? ' selected' : ''}>meters</option></select></span></label>
     <label class="f">Default interval per 100<input type="text" class="ivl" id="f-ivl" value="${fmtMS(w.defSec || 90)}" inputmode="numeric" placeholder="1:30"></label>
+  </div>
+  <div class="meta meta2">
+    <div class="f gp"><span>Groups doing this practice</span><div class="gchips"><span id="gchips"></span><button class="btn sm" id="b-groups" type="button">Choose groups…</button></div></div>
+    <label class="f">Default stroke<select id="d-stroke">${ORDER.stroke.map(k => `<option${(w.defStroke || 'Free') === k ? ' selected' : ''}>${k}</option>`).join('')}</select></label>
+    <label class="f">Default type<select id="d-type">${ORDER.type.map(k => `<option${(w.defType || 'Swim') === k ? ' selected' : ''}>${k}</option>`).join('')}</select></label>
+    <label class="f">Default intensity<select id="d-int">${ORDER.intensity.map(k => `<option${(w.defInt || 'Moderate') === k ? ' selected' : ''}>${k}</option>`).join('')}</select></label>
   </div>
   <div class="two">
     <div>
@@ -848,6 +981,7 @@ function renderEditor(w) {
       </div>
       </div>
       <div class="card selcard" id="sel" aria-live="polite"></div>
+      <details class="card help"${w.notes ? ' open' : ''}><summary>Notes</summary><textarea id="f-notes" class="notes" rows="4" placeholder="Notes for this practice (can be printed on the PDF)">${esc(w.notes || '')}</textarea></details>
       <details class="card help"><summary>How to write sets</summary><pre>${esc(HELP)}</pre></details>
     </div>
     <aside class="side" id="side" aria-label="Practice summary"></aside>
@@ -869,7 +1003,12 @@ function renderEditor(w) {
     d.querySelector('#x-yes').onclick = () => { delete db.workouts[w.id]; state.cur = null; saveDB(); closeDlg(); go('#/week/' + w.date); };
   });
   q('b-copy').onclick = () => copyDialog(w);
-  q('b-print').onclick = () => printWorkout(w);
+  q('b-print').onclick = () => printDialog(w);
+  q('f-notes').oninput = e => { w.notes = e.target.value; saveSoon(); };
+  q('d-stroke').onchange = e => { w.defStroke = e.target.value; saveSoon(); update(); };
+  q('d-type').onchange = e => { w.defType = e.target.value; saveSoon(); update(); };
+  q('d-int').onchange = e => { w.defInt = e.target.value; saveSoon(); update(); };
+  q('b-groups').onclick = () => groupPickDialog(w, () => { saveSoon(); update(); });
   q('gh').onclick = e => { const b = e.target.closest('button[data-k]'); if (b) { state.active = b.dataset.k; w._update(); } };
   if ('ResizeObserver' in window) { const ro = new ResizeObserver(() => drawGutter()); ro.observe(q('mirror')); }
 
@@ -884,8 +1023,11 @@ function renderEditor(w) {
       else if (!p.applies) cls += ' dim';
       return `<div class="${cls}"${st}>${hl(L.raw) || '&#8203;'}</div>`;
     }).join('');
-    drawTabs(); drawGutter(); drawSide();
+    drawChips(); drawTabs(); drawGutter(); drawSide();
   };
+  function drawChips() {
+    q('gchips').innerHTML = (w.groups || []).map(n => `<span class="chip" style="--gc:${colorFor(n)}">${esc(n)}</span>`).join('') || '<span class="muted" style="font-size:14px">None chosen – groups from #tags still count</span>';
+  }
   function drawTabs() {
     const el = q('tabs');
     if (!A.hasGroups) { el.innerHTML = `<button class="btn sm" id="t-add">+ Add group section</button><span class="tabhint">Write different sets for different groups in one practice.</span>`; }
@@ -925,15 +1067,25 @@ function renderEditor(w) {
     const g = q('gut'); g.innerHTML = h; g.style.minHeight = q('mirror').offsetHeight + 'px';
   }
   function drawSide() {
-    const r = curItem.res, ua = unitAbbr(w.unit);
+    const r = curItem.res, ua = unitAbbr(w.unit), n = A.items.length;
+    const med = A.hasGroups ? pick(A, 'median') : null;
+    const ys = A.items.map(i => i.res.yds), mn = Math.min(...ys), mx = Math.max(...ys);
+    const dl = (d, unit, tol) => { const v = Math.round(d); return v === 0 ? '<em class="dl">=</em>' : `<em class="dl${Math.abs(d) > tol ? ' off' : ''}">${v > 0 ? '+' : '−'}${fmtNum(Math.abs(v))}${unit}</em>`; };
+    const ibar = m => `<div class="ibar">${ORDER.intensity.filter(k => m[k] > 0.01).map(k => `<i title="${k}: ${fmtNum(m[k])}" style="flex:${m[k]};background:${COLORS.intensity[k]}"></i>`).join('')}</div>`;
     q('side').innerHTML = `
       <div class="card sp-card">
         <h3>${A.hasGroups ? esc(curItem.name) + ' total' : 'Practice total'}</h3>
         <div class="big">${fmtNum(r.yds)}<small>${ua}</small></div>
         <div class="kv"><div><b>${fmtDur(r.secs)}</b><span>duration (est.)</span></div><div><b>${fmtClock(r.end)}</b><span>finishes</span></div></div>
+        ${A.hasGroups && n > 1 ? `<div class="medrow"><b class="num">${fmtNum(med.yds)}</b> ${ua} overall <span class="muted">(median of ${n} groups, ${fmtNum(mn)}–${fmtNum(mx)})</span></div>` : ''}
       </div>
-      ${A.hasGroups ? `<div class="card sp-card"><h3>Groups</h3><table class="grp-table">${A.items.map(it => `
-        <tr class="${it.key === state.active ? 'on' : ''}"><td><button data-k="${esc(it.key)}" style="--gc:${colorFor(it.name)}"><span class="dot"></span>${esc(it.name)}</button></td><td>${fmtNum(it.res.yds)}</td><td>${fmtDur(it.res.secs)}</td></tr>`).join('')}</table></div>` : ''}
+      ${A.hasGroups ? `<div class="card sp-card"><h3>Groups <span class="muted" style="font-weight:400">· compared with the median</span></h3>
+        <table class="grp-table"><thead><tr><th></th><th>Distance</th><th>Time</th></tr></thead><tbody>${A.items.map(it => `
+        <tr class="${it.key === state.active ? 'on' : ''}"><td><button data-k="${esc(it.key)}" style="--gc:${colorFor(it.name)}"><span class="dot"></span>${esc(it.name)}</button></td>
+          <td>${fmtNum(it.res.yds)}${n > 1 ? dl(it.res.yds - med.yds, '', med.yds * 0.04) : ''}</td>
+          <td>${fmtDur(it.res.secs)}${n > 1 ? dl((it.res.secs - med.secs) / 60, 'm', Math.max(2, med.secs / 60 * 0.06)) : ''}</td></tr>
+        <tr class="mini"><td colspan="3">${ibar(it.res.stats.intensity)}</td></tr>`).join('')}</tbody></table>
+        <p class="grp-note">Bars show each group's intensity mix. Amber means more than a few percent away from the median.</p></div>` : ''}
       <div class="card sp-card">${breakdowns(r.stats)}</div>`;
     q('side').onclick = e => { const b = e.target.closest('.grp-table button'); if (b) { state.active = b.dataset.k; update(); } };
   }
@@ -946,14 +1098,14 @@ function renderEditor(w) {
     else {
       const r = blockRange(A, lineOf(s0));
       if (!r) { box.innerHTML = '<div class="muted">Click in a set to see its distance, time, pace, strokes, types and intensity.</div>'; return; }
-      from = r[0]; to = r[1]; label = 'Block at cursor';
+      from = r[0]; to = r[1]; label = 'Line at cursor';
     }
     let it = curItem; const L = A.parsed[from];
     if (A.hasGroups && L) {
       const sec = L.kind === 'group' ? L.groups : L.section;
       if (sec && !sec.some(n => n.toLowerCase() === curItem.key)) { const f = A.items.find(i => sec.some(n => n.toLowerCase() === i.key)); if (f) it = f; }
     }
-    box.innerHTML = selHTML(summarize(it.res, from, to), label, A.hasGroups ? it.name : null, unitAbbr(w.unit));
+    box.innerHTML = selHTML(summarize(it.res, from, to, label === 'Line at cursor'), label, A.hasGroups ? it.name : null, unitAbbr(w.unit));
   }
   document.onselectionchange = () => { if (document.activeElement === ta) updSel(); };
   ta.addEventListener('focus', updSel);
@@ -1018,6 +1170,177 @@ function copyDialog(w) {
   });
 }
 
+/* ---------- group picker ---------- */
+function knownGroups(extra) {
+  const m = new Map();
+  [].concat(db.settings.groupList || [], allGroups().map(g => g.name), extra || []).forEach(n => { n = String(n).trim(); if (n && !m.has(n.toLowerCase())) m.set(n.toLowerCase(), n); });
+  return [...m.values()];
+}
+function groupPickDialog(w, done) {
+  const names = knownGroups(w.groups), chosen = new Set((w.groups || []).map(n => n.toLowerCase()));
+  dialog(`<h2>Groups doing this practice</h2>
+    <p style="margin:0">Pick every group that takes part. Each one gets its own totals, even if they all swim the same sets. Use <b>#tags</b> in the text for sets only some groups do.</p>
+    <div class="cbs">${names.map(n => `<label class="chk"><input type="checkbox" value="${esc(n)}"${chosen.has(n.toLowerCase()) ? ' checked' : ''}> <span class="dot" style="--gc:${colorFor(n)}"></span>${esc(n)}</label>`).join('')}</div>
+    <label class="f">Add another group (comma separated)<input type="text" id="gp-new" placeholder="e.g. Sprint, Distance"></label>
+    <div class="foot"><button class="btn" id="gp-no">Cancel</button><button class="btn primary" id="gp-ok">Done</button></div>`, d => {
+    d.querySelector('#gp-no').onclick = closeDlg;
+    d.querySelector('#gp-ok').onclick = () => {
+      const picked = [...d.querySelectorAll('.cbs input:checked')].map(i => i.value);
+      d.querySelector('#gp-new').value.split(',').map(x => x.trim()).filter(Boolean).forEach(n => {
+        if (!picked.some(x => x.toLowerCase() === n.toLowerCase())) picked.push(n);
+        if (!(db.settings.groupList || []).some(x => x.toLowerCase() === n.toLowerCase())) db.settings.groupList.push(n);
+      });
+      w.groups = picked; closeDlg(); done();
+    };
+  });
+}
+
+/* ---------- PDF (jsPDF) ---------- */
+const pdfSafe = t => String(t).replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...').replace(/[•·]/g, '*').replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
+const fmtElapsed = sec => { const m = Math.floor(sec / 60); return `${Math.floor(m / 60)}:${pad(m % 60)}`; };
+function buildPdf(w, opt) {
+  if (!(window.jspdf && window.jspdf.jsPDF)) throw new Error('NOPDF');
+  const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
+  const A = analyze(w), ua = unitAbbr(w.unit);
+  const PW = 612, PH = 792, M = 54, LH = 15, RW = opt.metrics ? 118 : 0, FS = 11;
+  /* groups that swim exactly the same thing share one page, like Commit */
+  const pages = [];
+  A.items.forEach(it => {
+    const lines = []; let gap = false;
+    A.parsed.forEach((L, i) => {
+      const p = it.res.per[i]; if (!p || !p.applies || L.kind === 'group') return;
+      if (L.kind === 'blank') { gap = lines.length > 0; return; }
+      if (gap) { lines.push({ gap: true }); gap = false; }
+      lines.push({ text: L.text, ind: Math.max(0, L.indent - (L.base != null ? L.base : 0)), total: p.showTotal ? { y: p.cumY, s: p.cumS } : null });
+    });
+    const sig = JSON.stringify([lines, Math.round(it.res.yds), Math.round(it.res.secs)]);
+    const ex = pages.find(g => g.sig === sig);
+    if (ex) { if (it.name) ex.tags.push(it.name); } else pages.push({ sig, tags: it.name ? [it.name] : [], lines, res: it.res });
+  });
+  const when = sec => opt.zero ? fmtElapsed(sec) : fmtClock(A.W.startSec + sec);
+  pages.forEach((pg, pi) => {
+    if (pi) doc.addPage();
+    let y = M;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0);
+    doc.text(pdfSafe(w.title || 'Practice'), PW / 2, y, { align: 'center' }); y += 18;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+    doc.text(pdfSafe(`${fmtLong(w.date)} - ${fmtClock(A.W.startSec)} ${w.pool || 25} ${unitWord(w.unit)}`), PW / 2, y, { align: 'center' }); y += 14;
+    doc.setFontSize(9); doc.setTextColor(90);
+    doc.text(`Default interval: ${fmtMS(w.defSec || 90)} per 100`, PW / 2, y, { align: 'center' }); y += 8;
+    doc.setDrawColor(150); doc.line(M, y, PW - M, y); y += 20;
+    doc.setTextColor(0);
+    if (pg.tags.length) { doc.setFont('helvetica', 'bold'); doc.setFontSize(FS); doc.text(pdfSafe(pg.tags.map(t => '#' + t).join(' ') + ' sets'), M, y); y += LH + 6; doc.setFont('helvetica', 'normal'); }
+    doc.setFontSize(FS);
+    if (opt.metrics) { doc.setFontSize(8.5); doc.setTextColor(110); doc.text(`0 ${ua} ${when(0)}`, PW - M, y - 4, { align: 'right' }); doc.setTextColor(0); doc.setFontSize(FS); }
+    pg.lines.forEach(l => {
+      if (l.gap) { y += 7; return; }
+      const indent = l.ind * 7;
+      const wrapped = doc.splitTextToSize(pdfSafe(l.text), PW - 2 * M - indent - RW);
+      if (y + wrapped.length * LH > PH - M - 50) { doc.addPage(); y = M; }
+      wrapped.forEach((ln, k) => { doc.text(ln, M + indent, y + k * LH); });
+      const last = y + (wrapped.length - 1) * LH;
+      if (opt.metrics && l.total) { doc.setFontSize(8.5); doc.setTextColor(110); doc.text(`${fmtNum(l.total.y)} ${ua} ${when(l.total.s)}`, PW - M, last + 12, { align: 'right' }); doc.setTextColor(0); doc.setFontSize(FS); y += 8; }
+      y += wrapped.length * LH;
+    });
+    y += 14;
+    if (y > PH - M - 40) { doc.addPage(); y = M; }
+    doc.setDrawColor(150); doc.line(M, y, PW - M, y); y += 16;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(FS);
+    const tl = pg.tags.length ? pg.tags.map(t => '#' + t).join(' ') + ' totals: ' : 'Totals: ';
+    doc.text(pdfSafe(`${tl}${fmtNum(pg.res.yds)} ${unitWord(w.unit)} - ${fmtClock(pg.res.end)} (${fmtDurClock(A.W.startSec, pg.res.end)})`), PW - M, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    if (opt.notes && (w.notes || '').trim() && pi === pages.length - 1) {
+      y += 28; doc.setFont('helvetica', 'bold'); doc.text('Notes', M, y); doc.setFont('helvetica', 'normal'); y += LH;
+      doc.splitTextToSize(pdfSafe(w.notes), PW - 2 * M).forEach(ln => { if (y > PH - M) { doc.addPage(); y = M; } doc.text(ln, M, y); y += LH; });
+    }
+  });
+  const name = `${w.date} ${w.title || 'Practice'}`.replace(/[\\/:*?"<>|]+/g, '-').trim() + '.pdf';
+  return { blob: doc.output('blob'), name, doc };
+}
+
+/* ---------- Google Drive (saves into one folder this app creates) ---------- */
+let driveToken = null, driveExp = 0;
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[data-src="${src}"]`)) { res(); return; }
+    const sc = document.createElement('script'); sc.src = src; sc.async = true; sc.dataset.src = src;
+    sc.onload = () => res(); sc.onerror = () => rej(new Error('Could not load ' + src + ' – check your connection.'));
+    document.head.appendChild(sc);
+  });
+}
+const GSI = 'https://accounts.google.com/gsi/client';
+function driveAuth() {
+  const cid = (db.settings.gClientId || '').trim();
+  if (!cid) return Promise.reject(new Error('NOCLIENT'));
+  if (driveToken && Date.now() < driveExp - 60000) return Promise.resolve(driveToken);
+  return loadScript(GSI).then(() => new Promise((resolve, reject) => {
+    const tc = window.google.accounts.oauth2.initTokenClient({
+      client_id: cid, scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: r => { if (r.error) { reject(new Error(r.error_description || r.error)); return; } driveToken = r.access_token; driveExp = Date.now() + (r.expires_in || 3600) * 1000; resolve(driveToken); },
+      error_callback: e => reject(new Error((e && (e.message || e.type)) || 'Google sign-in was closed.'))
+    });
+    tc.requestAccessToken({});
+  }));
+}
+async function driveFolder(token) {
+  const S = db.settings, H = { Authorization: 'Bearer ' + token };
+  if (S.gFolderId) {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(S.gFolderId)}?fields=id,trashed`, { headers: H });
+    if (r.ok) { const j = await r.json(); if (!j.trashed) return S.gFolderId; }
+  }
+  const name = (S.gFolderName || 'Pool Deck PDFs').trim();
+  const q = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and name='${name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' and trashed=false`);
+  let r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`, { headers: H });
+  if (!r.ok) throw new Error('Drive search failed (' + r.status + ')');
+  let j = await r.json();
+  if (j.files && j.files.length) { S.gFolderId = j.files[0].id; saveDB(); return S.gFolderId; }
+  r = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, H), body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' }) });
+  if (!r.ok) throw new Error('Could not create the Drive folder (' + r.status + ')');
+  j = await r.json(); S.gFolderId = j.id; saveDB(); return j.id;
+}
+async function driveUpload(blob, name, mime) {
+  const token = await driveAuth(), folder = await driveFolder(token);
+  const fd = new FormData();
+  fd.append('metadata', new Blob([JSON.stringify({ name, parents: [folder], mimeType: mime })], { type: 'application/json' }));
+  fd.append('file', blob);
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd });
+  if (!r.ok) throw new Error('Drive upload failed (' + r.status + ')');
+  return r.json();
+}
+function driveErr(e, msgEl) {
+  if (e && e.message === 'NOCLIENT') { msgEl.innerHTML = 'Google Drive is not set up yet. <a href="#" id="go-set">Open settings</a> for the 5-minute setup.'; const a = msgEl.querySelector('#go-set'); a.onclick = ev => { ev.preventDefault(); closeDlg(); settingsDialog(); }; }
+  else msgEl.textContent = (e && e.message) ? e.message : 'Something went wrong talking to Google.';
+}
+
+function printDialog(w) {
+  const o = db.settings.pdfOpts;
+  dialog(`<h2>Save or print</h2>
+    <label class="chk"><input type="checkbox" id="o-m"${o.metrics ? ' checked' : ''}> Show running yards and time down the side</label>
+    <div class="row"><label class="chk"><input type="radio" name="o-t" value="clock"${o.zero ? '' : ' checked'}> Clock time</label><label class="chk"><input type="radio" name="o-t" value="zero"${o.zero ? ' checked' : ''}> Start at 0:00</label></div>
+    <label class="chk"><input type="checkbox" id="o-n"${o.notes ? ' checked' : ''}> Include notes</label>
+    <p class="muted" style="margin:0;font-size:14px">Groups that swim exactly the same sets share a page; each different set gets its own page.</p>
+    <div class="row"><button class="btn primary" id="o-dl">Download PDF</button><button class="btn" id="o-dr">Save to Google Drive</button><button class="btn" id="o-pr">Print…</button></div>
+    <p class="msg" id="o-msg" role="status"></p>
+    <div class="foot"><button class="btn" id="o-x">Close</button></div>`, d => {
+    const msg = d.querySelector('#o-msg');
+    const opts = () => { const v = { metrics: d.querySelector('#o-m').checked, zero: d.querySelector('input[name=o-t]:checked').value === 'zero', notes: d.querySelector('#o-n').checked }; db.settings.pdfOpts = v; saveSoon(); return v; };
+    d.querySelector('#o-x').onclick = closeDlg;
+    d.querySelector('#o-pr').onclick = () => { opts(); closeDlg(); printWorkout(w); };
+    d.querySelector('#o-dl').onclick = () => {
+      try { const r = buildPdf(w, opts()); r.doc.save(r.name); msg.textContent = 'Downloaded ' + r.name; }
+      catch (e) { msg.textContent = e.message === 'NOPDF' ? 'The PDF tool did not load (are you offline?). Use Print… and choose Save as PDF.' : 'Could not make the PDF: ' + e.message; }
+    };
+    d.querySelector('#o-dr').onclick = async () => {
+      let r;
+      try { r = buildPdf(w, opts()); } catch (e) { msg.textContent = e.message === 'NOPDF' ? 'The PDF tool did not load (are you offline?).' : 'Could not make the PDF: ' + e.message; return; }
+      msg.textContent = 'Saving to Google Drive…';
+      try {
+        const f = await driveUpload(r.blob, r.name, 'application/pdf');
+        msg.innerHTML = `Saved to the “${esc(db.settings.gFolderName)}” folder in Google Drive. ` + (f.webViewLink ? `<a href="${esc(f.webViewLink)}" target="_blank" rel="noopener">Open it</a>` : '');
+      } catch (e) { driveErr(e, msg); }
+    };
+  });
+}
 /* ---------- print ---------- */
 function printWorkout(w) {
   const A = analyze(w), ua = unitAbbr(w.unit);
@@ -1038,6 +1361,75 @@ function printWorkout(w) {
   window.print();
 }
 
+/* ---------- strokes / types / intensity editor ---------- */
+const VTABS = [['intensity', 'Intensities'], ['stroke', 'Strokes'], ['type', 'Types'], ['equip', 'Equipment']];
+const VHELP = {
+  intensity: 'How hard a set is. Type the words you write in workouts (comma separated) and give each a level from 1 (rest) to 12 (as fast as possible). If a line contains several of your words, the longest phrase wins, so “race pace” beats “race”.',
+  stroke: 'Which stroke a set counts toward. A line with none of these words counts as the practice’s default stroke.',
+  type: 'Swim, kick, pull, drill and so on. Lines like “100 d/k” or “75 k 25 d” use the one-letter shorthand k, d, s and p automatically.',
+  equip: 'Gear used in a set. A set can use several pieces at once, and each one gets the full yardage.'
+};
+function vocabEdit() { if (!db.settings.vocab) db.settings.vocab = JSON.parse(JSON.stringify(DEFAULT_VOCAB)); return db.settings.vocab; }
+function testLineHTML(text) {
+  const t = String(text || '').trim();
+  if (!t) return '<span class="muted">Type a line from a workout to see how it is counted.</span>';
+  const ua = unitAbbr(db.settings.unit);
+  const r = analyze({ text: t, time: '15:30', defSec: db.settings.defSec || 90 }).items[0].res;
+  const names = m => Object.entries(m).filter(([, v]) => v > 0.01).map(([k, v]) => `${esc(k)}${r.yds ? ' ' + fmtNum(v) : ''}`).join(', ') || '–';
+  if (r.yds > 0) return `<b>${fmtNum(r.yds)} ${ua}</b> · Strokes: ${names(r.stats.stroke)} · Types: ${names(r.stats.type)} · Intensity: ${names(r.stats.intensity)}${Object.keys(r.stats.equip).length ? ' · Equipment: ' + names(r.stats.equip) : ''}`;
+  const tp = tagParts(t), nm = l => l ? l.map(x => esc(x[0] || x)).join(', ') : '–';
+  return `<span class="muted">No distance in that line, so no yards. Words found:</span> Strokes: ${nm(tp.stroke)} · Types: ${nm(tp.type)} · Intensity: ${nm(tp.intensity)} · Equipment: ${nm(tp.equip)}`;
+}
+let tagTester = '';
+function renderTags(tab) {
+  app.onclick = null;
+  const col = tab === 'intensity';
+  const V = vocabEdit();
+  const rowsHTML = () => {
+    const list = V[tab].map((e, i) => ({ e, i }));
+    if (col) list.sort((a, b) => (+a.e.val || 5) - (+b.e.val || 5) || a.i - b.i);
+    return list.map(({ e, i }) => `<tr data-i="${i}">
+      <td><input type="text" class="t-name" value="${esc(e.name)}" aria-label="Name"></td>
+      <td><input type="text" class="t-words" value="${esc(e.words || '')}" placeholder="words you write, separated by commas" aria-label="Words"></td>
+      ${col ? `<td><input type="number" class="t-val" min="1" max="12" value="${+e.val || 5}" aria-label="Level 1 to 12"></td>` : ''}
+      <td><button class="btn sm danger t-del" type="button">Delete</button></td></tr>`).join('');
+  };
+  app.innerHTML = `
+  <div class="wk-head"><h1>Strokes, types &amp; intensity</h1></div>
+  <div class="card tagpage">
+    <div class="subtabs" role="tablist">${VTABS.map(([k, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}">${n}</button>`).join('')}</div>
+    <p class="help">${esc(VHELP[tab])} Changes apply to every practice right away.</p>
+    <div class="tester"><label class="f" for="tt-in">Try a line</label><input type="text" id="tt-in" placeholder="e.g. 4x50 all out kick with board" value="${esc(tagTester)}"><div class="out" id="tt-out" aria-live="polite"></div></div>
+    <table class="tagtable"><thead><tr><th>Name shown</th><th>Words that count as this</th>${col ? '<th>Level (1–12)</th>' : ''}<th></th></tr></thead><tbody id="tg-body">${rowsHTML()}</tbody></table>
+    <div class="tagactions"><button class="btn primary" id="tg-add" type="button">+ Add</button><button class="btn" id="tg-reset" type="button">Reset this list to the starting list</button></div>
+  </div>`;
+  const body = document.getElementById('tg-body'), out = document.getElementById('tt-out'), tin = document.getElementById('tt-in');
+  const refresh = () => { out.innerHTML = testLineHTML(tin.value); };
+  const commit = () => { applyVocab(V); saveSoon(); refresh(); };
+  tin.oninput = () => { tagTester = tin.value; refresh(); };
+  refresh();
+  app.querySelector('.subtabs').onclick = e => { const b = e.target.closest('button[data-tab]'); if (b) go('#/tags/' + b.dataset.tab); };
+  body.addEventListener('input', e => {
+    const tr = e.target.closest('tr'); if (!tr) return; const ent = V[tab][+tr.dataset.i]; if (!ent) return;
+    if (e.target.classList.contains('t-name')) ent.name = e.target.value;
+    else if (e.target.classList.contains('t-words')) ent.words = e.target.value;
+    else if (e.target.classList.contains('t-val')) ent.val = Math.min(12, Math.max(1, +e.target.value || 5));
+    commit();
+  });
+  body.addEventListener('click', e => {
+    const d = e.target.closest('.t-del'); if (!d) return;
+    const i = +d.closest('tr').dataset.i; V[tab].splice(i, 1); commit(); body.innerHTML = rowsHTML();
+  });
+  document.getElementById('tg-add').onclick = () => {
+    V[tab].push(col ? { name: '', words: '', val: 5 } : { name: '', words: '' }); body.innerHTML = rowsHTML();
+    const rows = body.querySelectorAll('tr'); const last = [...rows].find(r => +r.dataset.i === V[tab].length - 1); if (last) last.querySelector('.t-name').focus();
+  };
+  document.getElementById('tg-reset').onclick = () => {
+    if (!confirm('Put this list back to the starting list? Your changes to it will be lost.')) return;
+    V[tab] = JSON.parse(JSON.stringify(DEFAULT_VOCAB[tab])); commit(); body.innerHTML = rowsHTML();
+  };
+}
+
 /* ---------- search ---------- */
 function renderSearch() {
   app.onclick = null;
@@ -1050,7 +1442,7 @@ function renderSearch() {
     if (q) list = list.filter(w => (w.title + '\n' + w.text).toLowerCase().includes(q));
     if (!list.length) { res.innerHTML = `<div class="empty">${q ? 'No practices match that search.' : 'No practices yet. Add one from the Week page.'}</div>`; return; }
     res.innerHTML = list.slice(0, 100).map(w => {
-      const A = analyze(w), r = pick(A, 'max');
+      const A = analyze(w), r = pick(A, 'median');
       let snip = '';
       if (q) { const line = (w.text || '').split('\n').find(l => l.toLowerCase().includes(q)); if (line) snip = esc(line.trim()).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), m => `<mark>${m}</mark>`); }
       else snip = esc((w.text || '').split('\n').filter(l => l.trim()).slice(0, 3).join('  ·  '));
@@ -1079,9 +1471,27 @@ function csvText() {
     rows.push([w.date, w.title, it.name || 'Everyone', Math.round(it.res.yds * 10) / 10, unitWord(w.unit), Math.round(it.res.secs / 60)])));
   return rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
+function mergeBackup(d2) {
+  const have = new Set(allWorkouts().map(w => [w.date, w.title, w.text].join('|')));
+  let added = 0, skipped = 0;
+  Object.values(d2.workouts || {}).forEach(w => {
+    const key = [w.date, w.title, w.text].join('|');
+    if (have.has(key)) { skipped++; return; }
+    const c = Object.assign({}, w, { id: uid(), created: w.created || Date.now() });
+    db.workouts[c.id] = c; have.add(key); added++;
+    (c.groups || []).forEach(n => { if (!(db.settings.groupList || []).some(x => x.toLowerCase() === String(n).toLowerCase())) db.settings.groupList.push(n); });
+  });
+  saveDB(); return { added, skipped };
+}
+function readJsonFile(file, cb) {
+  const r = new FileReader();
+  r.onload = () => { try { const d2 = JSON.parse(r.result); if (!d2 || typeof d2.workouts !== 'object') throw new Error('bad'); cb(d2); } catch (err) { toast('That file is not a Pool Deck backup.'); } };
+  r.readAsText(file);
+}
 function settingsDialog() {
   const s = db.settings;
   dialog(`<h2>Settings &amp; backup</h2>
+    <p class="muted" style="margin:-8px 0 0;font-size:13px">${esc(BUILD)}</p>
     <div class="row">
       <label class="f">Week starts on<select id="s-ws"><option value="1"${s.weekStart === 1 ? ' selected' : ''}>Monday</option><option value="0"${s.weekStart === 0 ? ' selected' : ''}>Sunday</option></select></label>
       <label class="f">New practice start<input type="time" id="s-time" value="${esc(s.startTime)}"></label>
@@ -1092,34 +1502,62 @@ function settingsDialog() {
       <label class="f">Units<select id="s-unit"><option value="yards"${s.unit === 'yards' ? ' selected' : ''}>yards</option><option value="meters"${s.unit === 'meters' ? ' selected' : ''}>meters</option></select></label>
     </div>
     <p class="muted" style="margin:0;font-size:14px">These apply to new practices. Existing practices keep their own values.</p>
+    <label class="f">Your groups (one per line or comma separated)<textarea id="s-groups" rows="3">${esc((s.groupList || []).join(', '))}</textarea></label>
     <hr>
-    <p style="margin:0">Your practices live in this browser only. Download a backup now and then, and use it to move to another computer or phone.</p>
-    <div class="row"><button class="btn" id="s-dl">Download backup</button><button class="btn" id="s-up">Restore from backup…</button><button class="btn" id="s-csv">Export totals (CSV)</button></div>
+    <h2 style="font-size:22px">Google Drive</h2>
+    <p style="margin:0;font-size:15px">PDFs are saved into one folder in your Drive. The app can only see files it creates itself, not the rest of your Drive.</p>
+    <div class="row">
+      <label class="f" style="flex:1;min-width:240px">Google client ID<input type="text" id="s-cid" value="${esc(s.gClientId || '')}" placeholder="123456-abc.apps.googleusercontent.com"></label>
+      <label class="f">Folder name<input type="text" id="s-fold" value="${esc(s.gFolderName || 'Pool Deck PDFs')}"></label>
+    </div>
+    <details><summary>How to get a client ID (about 5 minutes, one time)</summary><ol>
+      <li>Go to console.cloud.google.com and create a project (any name).</li>
+      <li>Menu › APIs &amp; Services › Library › search “Google Drive API” › Enable.</li>
+      <li>APIs &amp; Services › OAuth consent screen › External › fill in the app name and your email › Save. Under Test users, add your own Gmail address.</li>
+      <li>Credentials › Create credentials › OAuth client ID › Web application.</li>
+      <li>Under “Authorized JavaScript origins” add your site address, for example <b>https://yourname.github.io</b> (no path, no slash at the end).</li>
+      <li>Create, copy the Client ID, and paste it above. This only works from your https://…github.io page, not from a file on your computer.</li>
+    </ol></details>
+    <div class="row"><button class="btn" id="s-test">Test Google connection</button><button class="btn" id="s-drv">Back up data to Drive</button></div>
+    <p class="msg" id="s-msg" role="status"></p>
+    <hr>
+    <p style="margin:0">Your practices live in this browser only. Download a backup now and then.</p>
+    <div class="row"><button class="btn" id="s-dl">Download backup</button><button class="btn" id="s-add">Add practices from a backup…</button><button class="btn" id="s-up">Replace everything from a backup…</button><button class="btn" id="s-csv">Export totals (CSV)</button></div>
     <input type="file" id="s-file" accept="application/json,.json" class="sr">
+    <input type="file" id="s-file2" accept="application/json,.json" class="sr">
     <hr>
     <div class="foot"><button class="btn danger" id="s-wipe" style="margin-right:auto">Delete all practices</button><button class="btn primary" id="s-done">Done</button></div>`, d => {
-    const q = id => d.querySelector(id);
-    q('#s-done').onclick = () => {
+    const q = id => d.querySelector(id), msg = q('#s-msg');
+    const saveFields = () => {
       const iv = parseIntervalStr(q('#s-ivl').value);
-      Object.assign(db.settings, { weekStart: +q('#s-ws').value, startTime: q('#s-time').value || '15:30', defSec: iv || s.defSec, pool: +q('#s-pool').value || 25, unit: q('#s-unit').value });
-      saveDB(); closeDlg(); route();
+      const groups = q('#s-groups').value.split(/[\n,]/).map(x => x.trim()).filter(Boolean);
+      Object.assign(db.settings, { weekStart: +q('#s-ws').value, startTime: q('#s-time').value || '15:30', defSec: iv || s.defSec, pool: +q('#s-pool').value || 25, unit: q('#s-unit').value,
+        groupList: groups, gClientId: q('#s-cid').value.trim(), gFolderName: q('#s-fold').value.trim() || 'Pool Deck PDFs' });
+      if (db.settings.gClientId) loadScript(GSI).catch(() => {});
+      saveDB();
+    };
+    q('#s-done').onclick = () => { saveFields(); closeDlg(); route(); };
+    q('#s-test').onclick = async () => {
+      saveFields(); msg.textContent = 'Opening Google sign-in…';
+      try { const t = await driveAuth(); await driveFolder(t); msg.textContent = `Connected. PDFs will go to “${db.settings.gFolderName}” in your Drive.`; } catch (e) { msg.textContent = e.message === 'NOCLIENT' ? 'Paste your client ID first.' : e.message; }
+    };
+    q('#s-drv').onclick = async () => {
+      saveFields(); msg.textContent = 'Saving backup to Drive…';
+      try { await driveUpload(new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' }), `pool-deck-backup-${todayStr()}.json`, 'application/json'); msg.textContent = 'Backup saved to your Drive folder.'; } catch (e) { driveErr(e, msg); }
     };
     q('#s-dl').onclick = () => download(`pool-deck-backup-${todayStr()}.json`, JSON.stringify(db, null, 1), 'application/json');
     q('#s-csv').onclick = () => download(`pool-deck-totals-${todayStr()}.csv`, csvText(), 'text/csv');
+    q('#s-add').onclick = () => q('#s-file2').click();
+    q('#s-file2').onchange = e => { const f = e.target.files[0]; if (!f) return; readJsonFile(f, d2 => { const r = mergeBackup(d2); saveFields(); closeDlg(); toast(`Added ${r.added} practices` + (r.skipped ? ` (${r.skipped} already here)` : '')); route(); }); };
     q('#s-up').onclick = () => q('#s-file').click();
     q('#s-file').onchange = e => {
       const f = e.target.files[0]; if (!f) return;
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          const d2 = JSON.parse(r.result);
-          if (!d2 || typeof d2.workouts !== 'object') throw new Error('bad');
-          if (!confirm(`Replace everything here with the backup (${Object.keys(d2.workouts).length} practices)?`)) return;
-          db = { workouts: d2.workouts, groupColors: d2.groupColors || {}, settings: Object.assign(defSettings(), d2.settings) };
-          saveDB(); closeDlg(); toast('Backup restored'); route();
-        } catch (err) { toast('That file is not a Pool Deck backup.'); }
-      };
-      r.readAsText(f);
+      readJsonFile(f, d2 => {
+        if (!confirm(`Replace everything here with the backup (${Object.keys(d2.workouts).length} practices)?`)) return;
+        db = { workouts: d2.workouts, groupColors: d2.groupColors || {}, settings: Object.assign(defSettings(), d2.settings) };
+        applyVocab(db.settings.vocab);
+        saveDB(); closeDlg(); toast('Backup restored'); route();
+      });
     };
     q('#s-wipe').onclick = () => { if (confirm('Delete every practice? This cannot be undone. Download a backup first if unsure.')) { db.workouts = {}; saveDB(); closeDlg(); route(); } };
   });
@@ -1127,11 +1565,13 @@ function settingsDialog() {
 
 /* ---------- start ---------- */
 db = loadDB();
+applyVocab(db.settings.vocab);
 if (!db.settings.seeded && Object.keys(db.workouts).length === 0) { const w = sampleWorkout(todayStr()); db.workouts[w.id] = w; }
 db.settings.seeded = true;
 saveDB();
 if (!storageOK) setStatus('Browser storage is blocked – changes will not be kept. Use Settings › Download backup.', true);
 document.getElementById('btn-settings').onclick = settingsDialog;
+if (db.settings.gClientId) loadScript(GSI).catch(() => {});
 window.addEventListener('hashchange', route);
 window.addEventListener('beforeunload', () => { if (saveTimer) saveDB(); });
 window.addEventListener('afterprint', () => { document.getElementById('printRoot').innerHTML = ''; });
