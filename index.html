@@ -181,6 +181,28 @@ label.f input,label.f select{color:var(--ink);font-size:16px}
 .tagtable .sw{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle}
 .tagactions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 @media (max-width:760px){.tagtable thead{display:none}.tagtable tr{display:grid;grid-template-columns:1fr auto;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.tagtable td:nth-child(2){grid-column:1 / -1}}
+.libpage{padding:16px 20px}
+.libbar{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.frow{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end}
+.frow .grow{flex:1;min-width:240px}
+.frow .rng{display:flex;gap:6px;align-items:center}
+.frow .rng input{width:92px}
+.frow .rng i{font-style:normal;color:var(--muted)}
+.chipsrow{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{background:var(--surface);border:1px solid var(--line-strong);border-radius:99px;padding:3px 12px;cursor:pointer;font-size:14px}
+.fchip em{font-style:normal;color:var(--muted);font-size:12px;margin-left:3px}
+.fchip.on{background:var(--aqua);border-color:var(--aqua);color:#fff}
+.fchip.on em{color:#fff;opacity:.85}
+.setcard{border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:10px;background:var(--surface)}
+.setcard header{font-size:15px}
+.setcard header b{font-size:22px}
+.setcard .rep{display:inline-block;margin-left:8px;padding:0 8px;border-radius:99px;background:var(--aqua-tint);color:var(--ink);font-size:12px}
+.tgs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.tg{display:inline-block;padding:0 9px;border-radius:99px;border:1px solid var(--tc);background:color-mix(in srgb,var(--tc) 14%,transparent);font-size:12.5px}
+.stext{margin:8px 0;font:14px/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:break-word;max-height:12em;overflow:auto;background:var(--bg-soft);padding:8px 10px;border-radius:4px}
+.setcard .acts{display:flex;gap:8px;flex-wrap:wrap}
+.libhead{display:flex;justify-content:space-between;align-items:center}
+dialog.wide{width:min(1000px,calc(100% - 20px))}
 details.help{margin-top:12px;padding:10px 14px}
 .selcard{margin-top:12px;padding:12px 16px}
 .sel-h{font-size:13px;color:var(--muted);margin-bottom:8px}
@@ -260,7 +282,8 @@ dialog::backdrop{background:rgba(8,18,26,.55)}
   <a class="brand" href="#/week">Pool Deck</a>
   <nav aria-label="Main">
     <a href="#/week" id="nav-week">Week</a>
-    <a href="#/search" id="nav-search">Search</a>
+    <a href="#/sets" id="nav-sets">Sets</a>
+    <a href="#/search" id="nav-search">Practices</a>
     <a href="#/tags" id="nav-tags">Strokes &amp; intensity</a>
     <button type="button" id="btn-settings">Settings &amp; backup</button>
   </nav>
@@ -373,6 +396,7 @@ const DEFAULT_VOCAB = {
     { name: 'Tempo Trainers', words: 'tempo trainer, tempo trainers, tt, tts' }
   ]
 };
+let VOCAB_VER = 0;
 const DIM = {}, ORDER = {}, COLORS = {}, INT_VAL = {};
 const PALETTE = ['#2F6FB5', '#7A5BC4', '#2E8B57', '#C9488A', '#D99A00', '#7D8F9B', '#0E8794', '#E4752B', '#8E6CC9', '#B5523B'];
 const intColor = v => `hsl(${Math.round(190 - (Math.min(12, Math.max(1, v)) - 1) * 16.8)},60%,${Math.round(72 - (Math.min(12, Math.max(1, v)) - 1) * 3.2)}%)`;
@@ -383,7 +407,7 @@ function wordsToSrc(words) {
     .map(w => w.split(' ').map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[- ]?')).join('|');
 }
 function applyVocab(v) {
-  v = v || DEFAULT_VOCAB;
+  v = v || DEFAULT_VOCAB; VOCAB_VER++;
   const clean = list => (Array.isArray(list) ? list : []).filter(e => e && String(e.name || '').trim()).map(e => Object.assign({}, e, { name: String(e.name).trim() }));
   const ints = clean(v.intensity).map((e, i) => Object.assign(e, { val: Math.min(12, Math.max(1, +e.val || 5)), i }));
   DIM.intensity = ints.slice().sort((a, b) => b.val - a.val || a.i - b.i).filter(e => wordsToSrc(e.words)).map(e => [e.name, wordsToSrc(e.words)]);
@@ -537,7 +561,7 @@ function parseText(text) {
     const m = line.match(/^\s*#(.*)$/);
     if (m) {
       const names = m[1].split(/[,#]/).map(s => s.trim()).filter(Boolean);
-      const all = !names.length || names.every(n => /^(all|everyone|everybody|shared|team)$/i.test(n));
+      const all = !names.length || names.every(n => /^all$/i.test(n));
       section = all ? null : names; secId++; hIndent = indent; mode = null; base = null;
       for (let j = i + 1; j < raw.length; j++) {                           // indented lines under the tag belong to it
         if (!raw[j].trim()) continue;
@@ -565,10 +589,10 @@ function evalWorkout(parsed, key, W) {
     if (L.kind === 'blank') { per[idx] = { applies: true, blank: true }; return; }
     while (stack.length && stack[stack.length - 1].indent >= L.indent) stack.pop();
     const parent = stack[stack.length - 1];
-    const mult = stack.reduce((p, f) => p * f.mult, 1);
+    const mult = stack.reduce((p, f) => f.counted ? 1 : p * f.mult, 1);   // a set line restarts the multiplier for lines indented under it
     const easy = stack.some(f => f.easy);
     const ctxs = stack.map(f => f.ctx).filter(Boolean).reverse();
-    const note = !!(parent && parent.counted);
+    const note = false;
     const frame = { indent: L.indent, mult: 1, easy: false, counted: false, ctx: '' };
     const lst = newStats();
     let ly = 0, ls = 0;
@@ -615,14 +639,17 @@ function evalWorkout(parsed, key, W) {
   });
   return { yds, secs, end: W.startSec + secs, stats, per };
 }
+function makeW(w) {
+  const safe = (list, name, fb) => list.includes(name) ? name : (list.includes(fb) ? fb : (list[0] || fb));
+  const dflt = { stroke: safe(ORDER.stroke, w.defStroke, 'Free'), type: safe(ORDER.type, w.defType, 'Swim'), intensity: safe(ORDER.intensity, w.defInt, 'Moderate') };
+  return { defSec: w.defSec || 90, startSec: timeToSec(w.time), dflt };
+}
 function analyze(w) {
   const parsed = parseText(w.text || '');
   const seen = new Map();
   (w.groups || []).forEach(n => { const k = String(n).toLowerCase(); if (k && !seen.has(k)) seen.set(k, n); });
   parsed.forEach(L => { if (L.kind === 'group' && L.groups) L.groups.forEach(n => { const k = n.toLowerCase(); if (!seen.has(k)) seen.set(k, n); }); });
-  const safe = (list, name, fb) => list.includes(name) ? name : (list.includes(fb) ? fb : (list[0] || fb));
-  const dflt = { stroke: safe(ORDER.stroke, w.defStroke, 'Free'), type: safe(ORDER.type, w.defType, 'Swim'), intensity: safe(ORDER.intensity, w.defInt, 'Moderate') };
-  const W = { defSec: w.defSec || 90, startSec: timeToSec(w.time), dflt };
+  const W = makeW(w);
   const keys = seen.size ? [...seen.keys()] : ['*'];
   const items = keys.map(k => ({ key: k, name: k === '*' ? null : seen.get(k), res: evalWorkout(parsed, k, W) }));
   const rootIndent = Math.min(99, ...parsed.filter(L => L.kind !== 'blank' && L.kind !== 'group' && L.base == null).map(L => L.indent));
@@ -645,7 +672,7 @@ function pick(A, sel) {
 function groupNamesIn(text) {
   const out = []; const re = /^\s*#(.*)$/gm; let m;
   while ((m = re.exec(text || ''))) m[1].split(/[,#]/).map(s => s.trim()).filter(Boolean).forEach(n => {
-    if (!/^(all|everyone|everybody|shared|team)$/i.test(n)) out.push(n);
+    if (!/^all$/i.test(n)) out.push(n);
   });
   return out;
 }
@@ -677,10 +704,46 @@ function summarize(res, from, to, ownScale) {
   }
   return out;
 }
+/* ---------- the set library: every block of every practice, with its own totals and tags ---------- */
+function shareList(map, total) {
+  return Object.entries(map).filter(([, v]) => v > 0.01).map(([k, v]) => [k, v / total]).filter(([, f]) => f >= 0.05).sort((a, b) => b[1] - a[1]);
+}
+function extractSets(w) {
+  const P = parseText(w.text || ''), W = makeW(w);
+  const rootIndent = Math.min(99, ...P.filter(L => L.kind !== 'blank' && L.kind !== 'group' && L.base == null).map(L => L.indent));
+  const rootOf = l => l.base != null ? l.base : rootIndent;
+  const firstTag = P.find(L => L.kind === 'group' && L.groups);
+  const sharedKey = (w.groups && w.groups.length) ? String(w.groups[0]).toLowerCase() : (firstTag ? firstTag.groups[0].toLowerCase() : '*');
+  const cache = {}, evalFor = k => cache[k] || (cache[k] = evalWorkout(P, k, W));
+  const out = [];
+  let i = 0;
+  while (i < P.length) {
+    const L = P[i];
+    if (L.kind === 'blank' || L.kind === 'group' || L.indent > rootOf(L)) { i++; continue; }
+    let e = i;
+    for (let j = i + 1; j < P.length; j++) { const M = P[j]; if (M.kind === 'group') break; if (M.kind === 'blank') continue; if (M.indent <= rootOf(M)) break; e = j; }
+    const key = L.section && L.section.length ? L.section[0].toLowerCase() : sharedKey;
+    const sm = summarize(evalFor(key), i, e, false);
+    if (sm.yds > 0) {
+      const raw = P.slice(i, e + 1).map(x => x.raw.replace(/\s+$/, ''));
+      while (raw.length && !raw[raw.length - 1].trim()) raw.pop();
+      const mi = Math.min(...raw.filter(x => x.trim()).map(x => x.length - x.trimStart().length));
+      const text = raw.map(x => x.slice(Math.min(mi, x.length - x.trimStart().length))).join('\n');
+      out.push({
+        wid: w.id, i, date: w.date, title: w.title || '', groups: L.section ? L.section.slice() : [],
+        text, first: L.text, yards: Math.round(sm.yds * 10) / 10, secs: Math.round(sm.secs),
+        part: /\b(warm[- ]?up|warmup)\b/i.test(L.text) ? 'Warm-up' : /\b(cool[- ]?down|cooldown)\b/i.test(L.text) ? 'Cool-down' : 'Main',
+        tags: { stroke: shareList(sm.stats.stroke, sm.yds), type: shareList(sm.stats.type, sm.yds), intensity: shareList(sm.stats.intensity, sm.yds), equip: shareList(sm.stats.equip, sm.yds) }
+      });
+    }
+    i = e + 1;
+  }
+  return out;
+}
 /*CORE-END*/
 
 /* ---------- storage ---------- */
-const BUILD = 'Pool Deck build 2026-10-23 (editable strokes & intensities)';
+const BUILD = 'Pool Deck build 2026-10-25 (set library, season search, multi-year import)';
 const KEY = 'pooldeck.v1';
 const defSettings = () => ({ v: 3, weekStart: 1, defSec: 90, unit: 'yards', pool: 25, startTime: '15:30', seeded: false, weekGroup: 'median',
   groupList: ['100s', '200Free', '200im', '500free', '50Free', '50and100free', 'Alternates', 'Autos', 'Metro', 'NonAutos', 'State', 'Varsity'],
@@ -762,8 +825,8 @@ function sampleWorkout(date) {
 const app = document.getElementById('app');
 const state = { cur: null, active: null, q: '' };
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2400); }
-function dialog(html, mount) {
-  const d = document.getElementById('dlg');
+function dialog(html, mount, cls) {
+  const d = document.getElementById('dlg'); d.className = cls || '';
   d.innerHTML = `<div class="dlg">${html}</div>`;
   d.onclick = e => { if (e.target === d) d.close(); };
   if (mount) mount(d);
@@ -798,13 +861,16 @@ function flushEditor() {
   state.cur = null;
 }
 function route() {
+  { const dd = document.getElementById('dlg'); if (dd && dd.open) closeDlg(); }
   flushEditor();
   const [r, arg] = location.hash.replace(/^#\/?/, '').split('/');
   document.getElementById('nav-week').removeAttribute('aria-current');
   document.getElementById('nav-search').removeAttribute('aria-current');
   document.getElementById('nav-tags').removeAttribute('aria-current');
+  document.getElementById('nav-sets').removeAttribute('aria-current');
   window.scrollTo(0, 0);
   if (r === 'edit' && db.workouts[arg]) { renderEditor(db.workouts[arg]); return; }
+  if (r === 'sets') { document.getElementById('nav-sets').setAttribute('aria-current', 'page'); renderSetsPage(); return; }
   if (r === 'tags') { document.getElementById('nav-tags').setAttribute('aria-current', 'page'); renderTags(['intensity', 'stroke', 'type', 'equip'].includes(arg) ? arg : 'intensity'); return; }
   if (r === 'search') { document.getElementById('nav-search').setAttribute('aria-current', 'page'); renderSearch(); return; }
   document.getElementById('nav-week').setAttribute('aria-current', 'page');
@@ -933,14 +999,14 @@ function hl(raw) {
   return out + esc(raw.slice(last));
 }
 
-function selHTML(sm, label, groupName, ua) {
+function selHTML(sm, label, groupName, ua, sim) {
   const pace = sm.paces && sm.paces.length ? sm.paces.slice(0, 3).map(fmtMS).join('<br>') : '–';
   const col = (title, map, kind) => {
     const rows = ORDER[kind].filter(k => map[k] > 0.01).map(k => `<div style="color:color-mix(in srgb,${COLORS[kind][k]} 72%,var(--ink))">${k}: ${fmtNum(map[k])}</div>`).join('');
     return `<div><span>${title}</span>${rows || '<div class="muted">–</div>'}</div>`;
   };
   const eq = Object.values(sm.stats.equip).some(v => v > 0.01) ? col('Equipment', sm.stats.equip, 'equip') : '';
-  return `<div class="sel-h">${label}${groupName ? ' · ' + esc(groupName) : ''}</div>
+  return `<div class="sel-h">${label}${groupName ? ' · ' + esc(groupName) : ''}${sim ? ' <button class="btn sm" id="sel-sim" type="button" style="margin-left:10px">Find similar sets</button>' : ''}</div>
     <div class="sel-grid"><div><span>Distance &amp; time</span><b>${fmtNum(sm.yds)} ${ua}</b><em>${fmtMS(sm.secs)}</em></div><div><span>100 pace</span><b class="paces">${pace}</b></div>
     ${col('Strokes', sm.stats.stroke, 'stroke')}${col('Types', sm.stats.type, 'type')}${col('Intensity', sm.stats.intensity, 'intensity')}${eq}</div>`;
 }
@@ -952,6 +1018,7 @@ function renderEditor(w) {
   <div class="ed-top">
     <a class="btn" href="#/week/${w.date}">‹ Week</a>
     <input type="text" class="title" id="f-title" placeholder="Practice title" aria-label="Practice title" value="${esc(w.title)}">
+    <button class="btn" id="b-sets">Find a set…</button>
     <button class="btn" id="b-copy">Copy to date…</button>
     <button class="btn" id="b-print">Save / print…</button>
     <button class="btn danger" id="b-del">Delete</button>
@@ -995,7 +1062,7 @@ function renderEditor(w) {
   q('f-pool').oninput = e => { w.pool = +e.target.value || 25; saveSoon(); };
   q('f-unit').onchange = e => { w.unit = e.target.value; saveSoon(); update(); };
   q('f-ivl').oninput = e => { const v = parseIntervalStr(e.target.value); e.target.classList.toggle('bad', !v); if (v) { w.defSec = v; saveSoon(); update(); } };
-  ta.addEventListener('input', () => { w.text = ta.value; saveSoon(); update(); });
+  ta.addEventListener('input', () => { w.text = ta.value; if (w.src) w.edited = true; saveSoon(); update(); });
   ta.addEventListener('keydown', onKey);
   q('b-del').onclick = () => dialog(`<h2>Delete practice?</h2><p style="margin:0">“${esc(w.title || 'Untitled practice')}” on ${fmtShort(w.date)} will be removed.</p>
       <div class="foot"><button class="btn" id="x-no">Keep it</button><button class="btn danger" id="x-yes">Delete</button></div>`, d => {
@@ -1004,6 +1071,7 @@ function renderEditor(w) {
   });
   q('b-copy').onclick = () => copyDialog(w);
   q('b-print').onclick = () => printDialog(w);
+  q('b-sets').onclick = () => openLibraryDialog(ta);
   q('f-notes').oninput = e => { w.notes = e.target.value; saveSoon(); };
   q('d-stroke').onchange = e => { w.defStroke = e.target.value; saveSoon(); update(); };
   q('d-type').onchange = e => { w.defType = e.target.value; saveSoon(); update(); };
@@ -1105,7 +1173,13 @@ function renderEditor(w) {
       const sec = L.kind === 'group' ? L.groups : L.section;
       if (sec && !sec.some(n => n.toLowerCase() === curItem.key)) { const f = A.items.find(i => sec.some(n => n.toLowerCase() === i.key)); if (f) it = f; }
     }
-    box.innerHTML = selHTML(summarize(it.res, from, to, label === 'Line at cursor'), label, A.hasGroups ? it.name : null, unitAbbr(w.unit));
+    const sm = summarize(it.res, from, to, label === 'Line at cursor');
+    box.innerHTML = selHTML(sm, label, A.hasGroups ? it.name : null, unitAbbr(w.unit), sm.yds > 0);
+    const sb = box.querySelector('#sel-sim');
+    if (sb) sb.onclick = () => {
+      const top = m => { const e = Object.entries(m).sort((a, b) => b[1] - a[1])[0]; return e && sm.yds && e[1] / sm.yds >= 0.6 ? e[0] : ''; };
+      openLibraryDialog(ta, { dmin: Math.floor(sm.yds * 0.9), dmax: Math.ceil(sm.yds * 1.1), tmin: Math.floor(sm.secs / 60 * 0.85), tmax: Math.ceil(sm.secs / 60 * 1.15), type: top(sm.stats.type), intensity: top(sm.stats.intensity) });
+    };
   }
   document.onselectionchange = () => { if (document.activeElement === ta) updSel(); };
   ta.addEventListener('focus', updSel);
@@ -1136,7 +1210,7 @@ function onKey(e) {
     e.preventDefault();
     if (line.length && !line.trim()) { ta.setSelectionRange(ls, s); insertText(ta, '\n'); return; }
     const ind = line.match(/^ */)[0];
-    const opens = (/^\s*#\s*\S/.test(line) && !/^\s*#\s*(all|everyone|everybody|shared|team)\s*$/i.test(line))
+    const opens = (/^\s*#\s*\S/.test(line) && !/^\s*#\s*all\s*$/i.test(line))
       || /^\s*(\d+\s*[xX]|\d+\s*(rounds?|times))\s*(?:[\[(].*)?$/i.test(line) || /^\s*(warm[- ]?up|cool[- ]?down|main( set)?|pre-?set|post-?set)\s*:?\s*$/i.test(line);
     insertText(ta, '\n' + ind + (opens ? '  ' : ''));
   }
@@ -1430,33 +1504,231 @@ function renderTags(tab) {
   };
 }
 
-/* ---------- search ---------- */
+/* ---------- seasons ---------- */
+function seasonOf(d) { const [y, m] = d.split('-').map(Number); const st = m >= 8 ? y : y - 1; return `${st}-${String((st + 1) % 100).padStart(2, '0')}`; }
+function seasonMeta() {
+  const starts = {}, ends = {};
+  allWorkouts().forEach(w => { const s = seasonOf(w.date), ws = weekStartOf(w.date, db.settings.weekStart); if (!starts[s] || ws < starts[s]) starts[s] = ws; if (!ends[s] || ws > ends[s]) ends[s] = ws; });
+  return { starts, ends };
+}
+const weeksBetween = (a, b) => Math.round((pdate(b) - pdate(a)) / 604800000);
+function seasonPos(date, meta) {
+  const s = seasonOf(date), ws = weekStartOf(date, db.settings.weekStart);
+  const wk = weeksBetween(meta.starts[s], ws) + 1, n = weeksBetween(meta.starts[s], meta.ends[s]) + 1, third = Math.ceil(n / 3);
+  return { season: s, wk, n, part: wk <= third ? 'Early' : wk > n - third ? 'Late' : 'Middle', final: wk > n - 2 };
+}
+function seasonMatch(st, date, meta) {
+  const pos = seasonPos(date, meta);
+  if (st.season && pos.season !== st.season) return false;
+  if (st.wmin !== '' && pos.wk < +st.wmin) return false;
+  if (st.wmax !== '' && pos.wk > +st.wmax) return false;
+  if (st.from && date < st.from) return false;
+  if (st.to && date > st.to) return false;
+  if (st.parts.size && ![...st.parts].some(p => p === 'Final' ? pos.final : pos.part === p)) return false;
+  return true;
+}
+function seasonFiltersHTML(st, meta) {
+  const seasons = Object.keys(meta.starts).sort().reverse();
+  const lbl = { Early: 'Early', Middle: 'Middle', Late: 'Late', Final: 'Last 2 weeks' };
+  return `<div class="frow">
+    <label class="f">Season<select data-f="season"><option value="">All seasons</option>${seasons.map(x => `<option value="${x}"${st.season === x ? ' selected' : ''}>${x}</option>`).join('')}</select></label>
+    <label class="f">Week of season<span class="rng"><input type="number" min="1" data-f="wmin" value="${esc(st.wmin)}" placeholder="from"><i>–</i><input type="number" min="1" data-f="wmax" value="${esc(st.wmax)}" placeholder="to"></span></label>
+    <label class="f">Dates<span class="rng"><input type="date" data-f="from" value="${esc(st.from)}"><i>–</i><input type="date" data-f="to" value="${esc(st.to)}"></span></label>
+    <div class="f"><span>Part of season</span><span class="chipsrow">${['Early', 'Middle', 'Late', 'Final'].map(p => `<button type="button" class="fchip${st.parts.has(p) ? ' on' : ''}" data-part="${p}">${lbl[p]}</button>`).join('')}</span></div>
+  </div>`;
+}
+
+/* ---------- set library ---------- */
+const libState = { q: '', sort: 'new', dedupe: true, dmin: '', dmax: '', tmin: '', tmax: '', season: '', wmin: '', wmax: '', from: '', to: '', limit: 30,
+  chips: { type: new Set(), stroke: new Set(), intensity: new Set(), equip: new Set(), part: new Set() }, parts: new Set() };
+function resetLib() {
+  Object.assign(libState, { q: '', sort: 'new', dedupe: true, dmin: '', dmax: '', tmin: '', tmax: '', season: '', wmin: '', wmax: '', from: '', to: '', limit: 30 });
+  for (const k in libState.chips) libState.chips[k] = new Set(); libState.parts = new Set();
+}
+const setCache = new Map();
+function setIndex() {
+  const out = [];
+  for (const w of allWorkouts()) {
+    const sig = [w.text, w.title, w.date, w.time, w.defSec, w.defStroke, w.defType, w.defInt, (w.groups || []).join(','), VOCAB_VER].join('|');
+    let c = setCache.get(w.id);
+    if (!c || c.sig !== sig) { c = { sig, sets: extractSets(w) }; setCache.set(w.id, c); }
+    for (const x of c.sets) out.push(x);
+  }
+  for (const id of [...setCache.keys()]) if (!db.workouts[id]) setCache.delete(id);
+  return out;
+}
+const normSet = t => t.toLowerCase().replace(/\s+/g, ' ').trim();
+function libFilter(all, st, meta) {
+  const q = st.q.trim().toLowerCase().split(/\s+/).filter(Boolean), num = v => v === '' ? null : +v;
+  const dmin = num(st.dmin), dmax = num(st.dmax), tmin = num(st.tmin), tmax = num(st.tmax);
+  const has = (s, dim, name) => ((s.tags[dim].find(([k]) => k === name) || [0, 0])[1]) >= 0.5;
+  return all.filter(s => {
+    if (dmin != null && s.yards < dmin) return false; if (dmax != null && s.yards > dmax) return false;
+    const mins = s.secs / 60; if (tmin != null && mins < tmin) return false; if (tmax != null && mins > tmax) return false;
+    for (const dim of ['type', 'stroke', 'intensity', 'equip']) if (st.chips[dim].size && ![...st.chips[dim]].some(n => has(s, dim, n))) return false;
+    if (st.chips.part.size && !st.chips.part.has(s.part)) return false;
+    if (q.length) { const hay = (s.text + ' ' + s.title + ' ' + s.groups.join(' ')).toLowerCase(); if (!q.every(x => hay.includes(x))) return false; }
+    return seasonMatch(st, s.date, meta);
+  });
+}
+function dedupeSets(list) {
+  const m = new Map();
+  for (const s of list) {
+    const k = normSet(s.text), e = m.get(k);
+    if (!e) m.set(k, Object.assign({}, s, { n: 1, oldest: s.date }));
+    else { e.n++; if (s.date > e.date) Object.assign(e, s, { n: e.n, oldest: e.oldest }); if (s.date < e.oldest) e.oldest = s.date; }
+  }
+  return [...m.values()];
+}
+function applyLibPreset(p) {
+  resetLib();
+  for (const k of ['dmin', 'dmax', 'tmin', 'tmax']) if (p[k] != null) libState[k] = String(p[k]);
+  if (p.type) libState.chips.type.add(p.type); if (p.intensity) libState.chips.intensity.add(p.intensity);
+}
+function libraryView(host, opts) {
+  const st = libState, all = setIndex(), meta = seasonMeta(), ua = unitAbbr(db.settings.unit);
+  const counts = { type: {}, stroke: {}, intensity: {}, equip: {}, part: {} };
+  all.forEach(s => { for (const dim of ['type', 'stroke', 'intensity', 'equip']) s.tags[dim].forEach(([n, f]) => { if (f >= 0.5) counts[dim][n] = (counts[dim][n] || 0) + 1; }); counts.part[s.part] = (counts.part[s.part] || 0) + 1; });
+  const chipRow = (dim, label, names) => { const list = names.filter(n => counts[dim][n]); return list.length ? `<div class="f"><span>${label}</span><span class="chipsrow">${list.map(n => `<button type="button" class="fchip${st.chips[dim].has(n) ? ' on' : ''}" data-chip="${dim}:${esc(n)}">${esc(n)} <em>${counts[dim][n]}</em></button>`).join('')}</span></div>` : ''; };
+  const sorts = [['new', 'Newest first'], ['old', 'Oldest first'], ['long', 'Longest first'], ['short', 'Shortest first'], ['time', 'Most time first'], ['repeat', 'Most repeated']];
+  if (!all.length) { host.innerHTML = '<div class="empty">No sets yet. Write a practice or add practices from a backup, and every block you write shows up here.</div>'; return; }
+  host.innerHTML = `<div class="libbar">
+    <div class="frow"><label class="f grow">Search the sets<input type="search" data-f="q" value="${esc(st.q)}" placeholder="words in the set, e.g. descend, snorkel, JMI, 25s"></label>
+      <label class="f">Sort<select data-f="sort">${sorts.map(([k, n]) => `<option value="${k}"${st.sort === k ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" data-c="dedupe"${st.dedupe ? ' checked' : ''}> Hide repeats</label></div>
+    <div class="frow"><label class="f">Distance (${ua})<span class="rng"><input type="number" min="0" data-f="dmin" value="${esc(st.dmin)}" placeholder="from"><i>–</i><input type="number" min="0" data-f="dmax" value="${esc(st.dmax)}" placeholder="to"></span></label>
+      <label class="f">Time (minutes)<span class="rng"><input type="number" min="0" data-f="tmin" value="${esc(st.tmin)}" placeholder="from"><i>–</i><input type="number" min="0" data-f="tmax" value="${esc(st.tmax)}" placeholder="to"></span></label></div>
+    ${chipRow('type', 'Type', ORDER.type)}${chipRow('stroke', 'Stroke', ORDER.stroke)}${chipRow('intensity', 'Intensity', ORDER.intensity)}${chipRow('equip', 'Equipment', ORDER.equip)}${chipRow('part', 'Part of practice', ['Warm-up', 'Main', 'Cool-down'])}
+    ${seasonFiltersHTML(st, meta)}
+    <div class="frow"><button class="btn sm" id="lib-clear" type="button">Clear filters</button><span id="lib-count" class="muted" role="status"></span></div>
+  </div><div id="lib-res"></div>`;
+  const res = host.querySelector('#lib-res'), countEl = host.querySelector('#lib-count');
+  let shown = [];
+  const card = (s, k) => {
+    const pos = seasonPos(s.date, meta), mins = s.secs / 60, pace = s.yards > 0 && s.secs > 0 ? fmtMS(s.secs / s.yards * 100) : '';
+    const tag = (dim, min) => s.tags[dim].filter(([, f]) => f >= min).slice(0, 2).map(([n, f]) => `<span class="tg" style="--tc:${COLORS[dim][n] || '#7D8F9B'}">${esc(n)}${f < 0.95 ? ' ' + Math.round(f * 100) + '%' : ''}</span>`).join('');
+    const rep = s.n > 1 ? `<span class="rep">Used ${s.n}× · ${seasonOf(s.oldest)} to ${seasonOf(s.date)}</span>` : '';
+    return `<article class="setcard"><header><b class="num">${fmtNum(s.yards)}</b> ${ua} · ${fmtDur(s.secs)}${pace ? ` · ${pace}/100` : ''}
+      <span class="muted"> · ${fmtLong(s.date)} · ${esc(s.title || 'Untitled')} · Week ${pos.wk}, ${pos.season}${s.groups.length ? ' · ' + esc(s.groups.join(', ')) : ''}</span>${rep}</header>
+      <div class="tgs">${tag('type', 0.3)}${tag('stroke', 0.3)}${tag('intensity', 0.3)}${tag('equip', 0.3)}${s.part !== 'Main' ? `<span class="tg" style="--tc:#7D8F9B">${s.part}</span>` : ''}</div>
+      <pre class="stext">${esc(s.text)}</pre>
+      <div class="acts">${opts.insert ? `<button class="btn sm primary" data-act="ins" data-k="${k}" type="button">Insert</button>` : `<button class="btn sm primary" data-act="add" data-k="${k}" type="button">Add to a practice…</button>`}
+        <button class="btn sm" data-act="copy" data-k="${k}" type="button">Copy</button><button class="btn sm" data-act="open" data-k="${k}" type="button">Open practice</button></div></article>`;
+  };
+  function draw() {
+    let list = libFilter(all, st, meta); const raw = list.length;
+    if (st.dedupe) list = dedupeSets(list);
+    const by = { new: (a, b) => b.date.localeCompare(a.date) || a.i - b.i, old: (a, b) => a.date.localeCompare(b.date) || a.i - b.i, long: (a, b) => b.yards - a.yards, short: (a, b) => a.yards - b.yards, time: (a, b) => b.secs - a.secs, repeat: (a, b) => (b.n || 1) - (a.n || 1) || b.date.localeCompare(a.date) };
+    list.sort(by[st.sort] || by.new);
+    shown = list.slice(0, st.limit);
+    countEl.textContent = `${fmtNum(list.length)} ${list.length === 1 ? 'set' : 'sets'}` + (st.dedupe && raw > list.length ? ` (${fmtNum(raw - list.length)} repeats hidden)` : '');
+    res.innerHTML = shown.length ? shown.map(card).join('') + (list.length > shown.length ? `<button class="btn" id="lib-more" type="button">Show more (${fmtNum(list.length - shown.length)} left)</button>` : '') : '<div class="empty">No sets match. Try loosening a filter.</div>';
+  }
+  host.oninput = e => { const f = e.target.dataset && e.target.dataset.f; if (f) { st[f] = e.target.value; st.limit = 30; draw(); } };
+  host.onchange = e => { if (e.target.dataset && e.target.dataset.c === 'dedupe') { st.dedupe = e.target.checked; st.limit = 30; draw(); } };
+  host.onclick = e => {
+    const chip = e.target.closest('[data-chip]'), part = e.target.closest('[data-part]'), act = e.target.closest('[data-act]');
+    if (chip) { const [dim, ...nm] = chip.dataset.chip.split(':'), name = nm.join(':'), set = st.chips[dim]; set.has(name) ? set.delete(name) : set.add(name); chip.classList.toggle('on'); st.limit = 30; draw(); return; }
+    if (part) { st.parts.has(part.dataset.part) ? st.parts.delete(part.dataset.part) : st.parts.add(part.dataset.part); part.classList.toggle('on'); st.limit = 30; draw(); return; }
+    if (e.target.closest('#lib-clear')) { resetLib(); libraryView(host, opts); return; }
+    if (e.target.closest('#lib-more')) { st.limit += 30; draw(); return; }
+    if (!act) return;
+    const s = shown[+act.dataset.k]; if (!s) return;
+    if (act.dataset.act === 'ins') opts.insert(s.text);
+    else if (act.dataset.act === 'copy') { (navigator.clipboard ? navigator.clipboard.writeText(s.text) : Promise.reject()).then(() => toast('Set copied'), () => toast('Could not copy – select the text instead')); }
+    else if (act.dataset.act === 'add') addToPracticeDialog(s.text);
+    else if (act.dataset.act === 'open') { closeDlg(); go('#/edit/' + s.wid); }
+  };
+  draw();
+}
+function renderSetsPage() {
+  app.onclick = null;
+  app.innerHTML = `<div class="wk-head"><h1>Set library</h1><span class="muted" style="font-size:15px">Every block from every practice, searchable. Use Insert inside a practice, or add a set to one from here.</span></div><div class="card libpage"><div id="libhost"></div></div>`;
+  libraryView(document.getElementById('libhost'), { insert: null });
+}
+function openLibraryDialog(ta, preset) {
+  if (preset) applyLibPreset(preset);
+  dialog(`<div class="libhead"><h2>Find a set</h2><button class="btn sm" id="lib-x" type="button">Close</button></div><div id="libhost"></div>`, d => {
+    d.querySelector('#lib-x').onclick = closeDlg;
+    libraryView(d.querySelector('#libhost'), { insert: txt => { closeDlg(); insertSet(ta, txt); toast('Set inserted'); } });
+  }, 'wide');
+}
+/* put a set at the cursor, indented to match where it lands */
+function insertSet(ta, text) {
+  const v = ta.value, pos = ta.selectionStart;
+  const ls = v.lastIndexOf('\n', pos - 1) + 1; let le = v.indexOf('\n', pos); if (le < 0) le = v.length;
+  const cur = v.slice(ls, le), isAll = l => /^\s*#\s*(all)?\s*$/i.test(l);
+  let ind = '';
+  if (cur.trim()) { ind = cur.match(/^ */)[0]; if (/^\s*#/.test(cur) && !isAll(cur)) ind += '  '; }
+  else {
+    const lines = v.slice(0, ls).split('\n'); lines.pop();
+    let k = lines.length - 1; while (k >= 0 && !lines[k].trim()) k--;
+    if (k >= 0) {
+      if (/^\s*#/.test(lines[k])) ind = isAll(lines[k]) ? '' : lines[k].match(/^ */)[0] + '  ';
+      else { let mn = 99; for (let j = k; j >= 0 && lines[j].trim() && !/^\s*#/.test(lines[j]); j--) mn = Math.min(mn, lines[j].match(/^ */)[0].length); ind = ' '.repeat(mn === 99 ? 0 : mn); }
+    }
+  }
+  const block = text.split('\n').map(l => l.trim() ? ind + l : l).join('\n');
+  if (cur.trim()) { ta.setSelectionRange(le, le); insertText(ta, '\n' + block); }
+  else { ta.setSelectionRange(ls, le); insertText(ta, block); }
+}
+function addToPracticeDialog(text) {
+  dialog(`<h2>Add this set to a practice</h2>
+    <label class="f">Date<input type="date" id="ap-date" value="${todayStr()}"></label>
+    <div id="ap-list" class="cbs" style="grid-template-columns:1fr"></div>
+    <div class="foot"><button class="btn" id="ap-no" type="button">Cancel</button><button class="btn primary" id="ap-yes" type="button">Add</button></div>`, d => {
+    const list = d.querySelector('#ap-list'), dt = d.querySelector('#ap-date');
+    const fill = () => { const ws = workoutsOn(dt.value); list.innerHTML = ws.map((w, k) => `<label class="chk"><input type="radio" name="ap" value="${w.id}"${k === 0 ? ' checked' : ''}> ${fmtClock(timeToSec(w.time))} ${esc(w.title || 'Untitled practice')}</label>`).join('') + `<label class="chk"><input type="radio" name="ap" value="new"${ws.length ? '' : ' checked'}> A new practice on this date</label>`; };
+    dt.onchange = fill; fill();
+    d.querySelector('#ap-no').onclick = closeDlg;
+    d.querySelector('#ap-yes').onclick = () => {
+      const pick_ = d.querySelector('input[name=ap]:checked'); if (!pick_ || !dt.value) return;
+      const w = pick_.value === 'new' ? newWorkout(dt.value) : db.workouts[pick_.value];
+      w.text = ((w.text || '').replace(/\s+$/, '') + (w.text && w.text.trim() ? '\n\n' : '') + text + '\n'); saveDB(); closeDlg(); toast('Set added'); go('#/edit/' + w.id);
+    };
+  });
+}
+
+/* ---------- practice search (with season filters) ---------- */
+const searchState = { q: '', sort: 'new', season: '', wmin: '', wmax: '', from: '', to: '', parts: new Set() };
 function renderSearch() {
   app.onclick = null;
-  app.innerHTML = `<div class="wk-head"><h1>Search</h1><input type="search" id="q" placeholder="Search titles and sets, e.g. “Pace” or “IM”" style="flex:1;min-width:240px;font-size:18px;padding:9px 12px" value="${esc(state.q)}" aria-label="Search practices"></div>
-    <div class="card" id="res"></div>`;
-  const input = document.getElementById('q'), res = document.getElementById('res');
+  const st = searchState, meta = seasonMeta();
+  app.innerHTML = `<div class="wk-head"><h1>Practices</h1></div><div class="card libpage"><div class="libbar">
+    <div class="frow"><label class="f grow">Words in the title or sets<input type="search" id="q" data-f="q" value="${esc(st.q)}" placeholder="e.g. state week, descend, 200 free"></label>
+      <label class="f">Sort<select data-f="sort"><option value="new"${st.sort === 'new' ? ' selected' : ''}>Newest first</option><option value="old"${st.sort === 'old' ? ' selected' : ''}>Oldest first</option></select></label></div>
+    ${seasonFiltersHTML(st, meta)}
+    <div class="frow"><button class="btn sm" id="s-clear" type="button">Clear filters</button><span id="s-count" class="muted" role="status"></span></div></div></div>
+    <div class="card" id="res" style="margin-top:14px"></div>`;
+  const res = document.getElementById('res'), cnt = document.getElementById('s-count');
   function run() {
-    const q = state.q.trim().toLowerCase();
-    let list = allWorkouts().sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
-    if (q) list = list.filter(w => (w.title + '\n' + w.text).toLowerCase().includes(q));
-    if (!list.length) { res.innerHTML = `<div class="empty">${q ? 'No practices match that search.' : 'No practices yet. Add one from the Week page.'}</div>`; return; }
+    const q = st.q.trim().toLowerCase();
+    let list = allWorkouts().filter(w => (!q || (w.title + '\n' + w.text).toLowerCase().includes(q)) && seasonMatch(st, w.date, meta));
+    list.sort((a, b) => (st.sort === 'old' ? 1 : -1) * (a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')));
+    cnt.textContent = `${fmtNum(list.length)} ${list.length === 1 ? 'practice' : 'practices'}`;
+    if (!list.length) { res.innerHTML = `<div class="empty">${allWorkouts().length ? 'No practices match.' : 'No practices yet. Add one from the Week page.'}</div>`; return; }
     res.innerHTML = list.slice(0, 100).map(w => {
-      const A = analyze(w), r = pick(A, 'median');
+      const A = analyze(w), r = pick(A, 'median'), pos = seasonPos(w.date, meta);
       let snip = '';
       if (q) { const line = (w.text || '').split('\n').find(l => l.toLowerCase().includes(q)); if (line) snip = esc(line.trim()).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), m => `<mark>${m}</mark>`); }
       else snip = esc((w.text || '').split('\n').filter(l => l.trim()).slice(0, 3).join('  ·  '));
-      return `<div class="sr-row"><div><b>${fmtShort(w.date)}</b><div class="muted" style="font-size:13px">${fmtNum(r.yds)} ${unitAbbr(w.unit)}</div></div>
+      return `<div class="sr-row"><div><b>${fmtShort(w.date)}</b><div class="muted" style="font-size:13px">${fmtNum(Math.round(r.yds))} ${unitAbbr(w.unit)} · Wk ${pos.wk}, ${pos.season}</div></div>
         <div style="min-width:0"><div style="font-weight:500">${esc(w.title || 'Untitled practice')}</div><div class="snip">${snip}</div></div>
         <div style="display:flex;gap:6px"><button class="btn sm" data-open="${w.id}">Open</button><button class="btn sm" data-copy="${w.id}">Copy to…</button></div></div>`;
-    }).join('') + (list.length > 100 ? `<div class="empty">Showing the 100 most recent matches.</div>` : '');
+    }).join('') + (list.length > 100 ? `<div class="empty">Showing the 100 most recent matches. Narrow the filters to see more.</div>` : '');
   }
-  input.oninput = () => { state.q = input.value; run(); };
+  const bar = app.querySelector('.libbar');
+  bar.oninput = e => { const f = e.target.dataset && e.target.dataset.f; if (f) { st[f] = e.target.value; run(); } };
+  bar.onclick = e => {
+    const part = e.target.closest('[data-part]');
+    if (part) { st.parts.has(part.dataset.part) ? st.parts.delete(part.dataset.part) : st.parts.add(part.dataset.part); part.classList.toggle('on'); run(); return; }
+    if (e.target.closest('#s-clear')) { Object.assign(st, { q: '', sort: 'new', season: '', wmin: '', wmax: '', from: '', to: '' }); st.parts = new Set(); renderSearch(); }
+  };
   res.onclick = e => {
     const o = e.target.closest('[data-open]'), c = e.target.closest('[data-copy]');
     if (o) go('#/edit/' + o.dataset.open); else if (c) copyDialog(db.workouts[c.dataset.copy]);
   };
-  run(); input.focus();
+  run(); document.getElementById('q').focus();
 }
 
 /* ---------- settings & backup ---------- */
@@ -1472,16 +1744,22 @@ function csvText() {
   return rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
 function mergeBackup(d2) {
-  const have = new Set(allWorkouts().map(w => [w.date, w.title, w.text].join('|')));
-  let added = 0, skipped = 0;
+  /* same date + title + start time = same practice. Practices that came from a Commit PDF import are refreshed;
+     anything you wrote or edited yourself is never overwritten. */
+  const keyOf = w => [w.date, (w.title || '').trim().toLowerCase(), w.time || ''].join('|');
+  const have = new Map(allWorkouts().map(w => [keyOf(w), w]));
+  let added = 0, updated = 0, skipped = 0;
   Object.values(d2.workouts || {}).forEach(w => {
-    const key = [w.date, w.title, w.text].join('|');
-    if (have.has(key)) { skipped++; return; }
+    const k = keyOf(w), ex = have.get(k);
+    if (ex) {
+      if (ex.src === 'commit-pdf' && w.src === 'commit-pdf' && !ex.edited) { Object.assign(ex, w, { id: ex.id, created: ex.created }); updated++; } else skipped++;
+      return;
+    }
     const c = Object.assign({}, w, { id: uid(), created: w.created || Date.now() });
-    db.workouts[c.id] = c; have.add(key); added++;
+    db.workouts[c.id] = c; have.set(k, c); added++;
     (c.groups || []).forEach(n => { if (!(db.settings.groupList || []).some(x => x.toLowerCase() === String(n).toLowerCase())) db.settings.groupList.push(n); });
   });
-  saveDB(); return { added, skipped };
+  saveDB(); return { added, updated, skipped };
 }
 function readJsonFile(file, cb) {
   const r = new FileReader();
@@ -1548,7 +1826,7 @@ function settingsDialog() {
     q('#s-dl').onclick = () => download(`pool-deck-backup-${todayStr()}.json`, JSON.stringify(db, null, 1), 'application/json');
     q('#s-csv').onclick = () => download(`pool-deck-totals-${todayStr()}.csv`, csvText(), 'text/csv');
     q('#s-add').onclick = () => q('#s-file2').click();
-    q('#s-file2').onchange = e => { const f = e.target.files[0]; if (!f) return; readJsonFile(f, d2 => { const r = mergeBackup(d2); saveFields(); closeDlg(); toast(`Added ${r.added} practices` + (r.skipped ? ` (${r.skipped} already here)` : '')); route(); }); };
+    q('#s-file2').onchange = e => { const f = e.target.files[0]; if (!f) return; readJsonFile(f, d2 => { const r = mergeBackup(d2); saveFields(); closeDlg(); toast(`Added ${r.added} practices` + (r.updated ? `, refreshed ${r.updated}` : '') + (r.skipped ? `, skipped ${r.skipped} already here` : '')); route(); }); };
     q('#s-up').onclick = () => q('#s-file').click();
     q('#s-file').onchange = e => {
       const f = e.target.files[0]; if (!f) return;
