@@ -215,6 +215,7 @@ dialog.wide{width:min(1000px,calc(100% - 20px))}
 .pctable th:first-child,.pctable td:first-child{text-align:left}
 .pctable td:nth-child(2){font-weight:600}
 .pctable tr.on{background:var(--aqua-tint)}
+.refnote{margin:0 0 12px;padding:9px 13px;border:1px solid var(--line-strong);border-radius:6px;background:var(--aqua-tint);font-size:14.5px}
 details.help{margin-top:12px;padding:10px 14px}
 .selcard{margin-top:12px;padding:12px 16px}
 .sel-h{font-size:13px;color:var(--muted);margin-bottom:8px}
@@ -507,7 +508,7 @@ function splitParens(text) {
   return { a: t.replace(/\s+/g, ' ').trim(), parens };
 }
 const IV = '(?:\\d{1,2}:\\d{2}|:\\d{2})';
-function findInterval(rest) {
+function findInterval(rest, bare) {
   let m = rest.match(new RegExp('(?:^|[\\s@])(?:@|on|at|x)\\s*(' + IV + '(?:\\s*/\\s*' + IV + ')*)', 'i'));
   if (m) {
     const list = m[1].split('/').map(x => parseIntervalStr(x.trim()));
@@ -517,6 +518,10 @@ function findInterval(rest) {
    || rest.match(/\brest\s*[:=]?\s*(\d{1,2}:\d{2}|:\d{2}|\d{1,3})\b/i)
    || rest.match(/\bR\s*[:=]\s*(\d{1,2}:\d{2}|:\d{2}|\d{1,3})\b/);
   if (m) return { restSecs: parseIntervalStr(m[1]), rest: rest.replace(m[0], ' ') };
+  if (bare) {                                   // "4 x 25's push and glide :40", "1 x 100 free kick 1:50 — notes" (reference sources only)
+    m = rest.match(new RegExp('(?:^|[\\s,;(])(' + IV + '(?:\\s*/\\s*' + IV + ')*)(?=$|[\\s,;)—–.])'));
+    if (m) { const list = m[1].split('/').map(x => parseIntervalStr(x.trim())); return { interval: list[0], intervals: list.length > 1 ? list : undefined, rest: rest.replace(m[1], ' ') }; }
+  }
   return { rest };
 }
 /* "3x300 @4:00/4:30/5:00": the intervals are used in order across the reps (spread evenly if there are more reps than intervals) */
@@ -529,13 +534,13 @@ function spreadIntervals(list, n) {
 const RESTISH = /\b(rest|break|stretch|visuali[sz]ation|talk|water|meeting|dryland|transition|wait)\b/i;
 const SWIMMY  = /\b(swim|swimming|choice|warm|cool|easy|ez|kick|drill|pull|free|back|breast|fly|im|stroke|build|pace|sprint|fast|race)\b/i;
 
-function mkSet(base, reps, dist, rest, prefix) {
-  const f = findInterval(rest);
+function mkSet(base, reps, dist, rest, prefix, bare) {
+  const f = findInterval(rest, bare);
   let segs = null;
   const parts = rest.split(',');
   const rp = parts.map(p => p.match(/^\s*(\d+)\s*[-–]\s*(\d+)(?!\d)(.*)$/));
   if (parts.length >= 2 && rp.every(Boolean)) {                 // 12x50 1-4 kick @1:00, 5-8 pull @:55 ...
-    segs = rp.map(m => { const g = findInterval(m[3]); return { n: +m[2] - +m[1] + 1, interval: g.interval, intervals: g.intervals, restSecs: g.restSecs, desc: (prefix + ' ' + g.rest).trim() }; });
+    segs = rp.map(m => { const g = findInterval(m[3], bare); return { n: +m[2] - +m[1] + 1, interval: g.interval, intervals: g.intervals, restSecs: g.restSecs, desc: (prefix + ' ' + g.rest).trim() }; });
   } else {
     const oe = f.rest.match(/^(.*?)\b(odds?|evens?)\b(.*?)\b(odds?|evens?)\b(.*)$/i);   // 6x100 odds sprint evens easy
     if (oe && oe[2][0].toLowerCase() !== oe[4][0].toLowerCase()) {
@@ -548,7 +553,40 @@ function mkSet(base, reps, dist, rest, prefix) {
   if (!segs) segs = [{ n: reps, interval: f.interval, intervals: f.intervals, restSecs: f.restSecs, desc: (prefix + ' ' + f.rest).trim() }];
   return Object.assign(base, { kind: 'set', reps, dist, segs });
 }
-function classify(line) {
+/* ---- reference sources (JJ, SwimSwam, photos): headers that state their yardage, "2x's", several sets on one line ---- */
+const STATED_RE = /^(.{1,60}?)\s*:\s+(\d{2,5})(?:\s*\/\s*(\d{2,6}))?(?![\d:])(?!\s*[xX]\b)\s*(.*)$/;
+function splitParts(str) {
+  const looksLike = p => /^\s*(?:\d+\s*[xX]\.?\s*\d+|\d{2,4}(?![\d\-:\/]))/.test(p), out = [];
+  for (const seg of str.split(';')) {
+    const pieces = seg.split(/\s\+\s/);
+    if (pieces.length > 1 && pieces.every(looksLike)) pieces.forEach(x => out.push(x)); else out.push(seg);
+  }
+  return out.map(x => x.trim()).filter(Boolean);
+}
+function classifyParts(parts, opts) {
+  return parts.map(x => classify(x.replace(/^[—–-]\s*/, ''), Object.assign({}, opts, { noMulti: true }))).filter(x => x.kind === 'set' || x.kind === 'dist');
+}
+function refClassify(base, a, ptext, opts) {
+  let m;
+  const ordinal = /^\s*\d+(?:st|nd|rd|th)\b/i.test(a), startsNum = !ordinal && /^\s*\d/.test(a);
+  if ((m = a.match(STATED_RE)) && !/^\d+\s*x'?s?$/i.test(m[1]) && !/^\d+\s*[xX]\.?\s*\d/.test(m[1])) {            // "Warm up: 900 — ...", "1st set: 500/1400 — 2x's"
+    const rest = m[4].replace(/^[—–-]\s*/, ''), txt = (m[1] + ' ' + rest + ' ' + ptext).trim();
+    return Object.assign(base, { kind: 'stated', stated: +m[2], cum: m[3] ? +m[3] : null, parts: classifyParts(splitParts(rest), opts), desc: txt, ctxText: txt });
+  }
+  if ((m = a.match(/^(\d+)\s*x'?s?\s*:\s*(.+)$/i))) {                         // "3x's: 2 x 75's ...; 1 x 50 ..."
+    const parts = classifyParts(splitParts(m[2]), opts);
+    if (parts.length) return Object.assign(base, { kind: 'multi', mult: +m[1], parts, desc: m[2], ctxText: '' });
+    return Object.assign(base, { kind: 'round', mult: +m[1], desc: m[2], ctxText: (m[2] + ' ' + ptext).trim() });
+  }
+  if (/[;+]/.test(a) && startsNum) {                                   // several sets written on one line
+    const parts = classifyParts(splitParts(a), opts);
+    if (parts.length >= 2) return Object.assign(base, { kind: 'multi', mult: 1, parts, desc: a, ctxText: '' });
+  }
+  if (!startsNum && (m = a.match(/\b(\d+)\s*x'?s\b/i))) return Object.assign(base, { kind: 'round', mult: +m[1], desc: a, ctxText: (a + ' ' + ptext).trim() });   // "1st Set: 4x's"
+  return null;
+}
+function classify(line, opts) {
+  opts = opts || {};
   const indent = (line.match(/^ */) || [''])[0].length;
   const text = line.trim();
   if (!text) return { kind: 'blank', indent, text };
@@ -558,25 +596,26 @@ function classify(line) {
   const base = { indent, text, a, cycle };
   let m;
   if (!a) return Object.assign(base, { kind: 'text', ctxText: ptext });
+  if (opts.ref && !opts.noMulti) { const r = refClassify(base, a, ptext, opts); if (r) return r; }
   if ((m = a.match(/^(\d{1,3}):(\d{2})(?!\d)\s*(.*)$/)))  return Object.assign(base, { kind: 'time', secs: +m[1] * 60 + +m[2], desc: (m[3] + ' ' + ptext).trim() });
   if ((m = a.match(/^:(\d{2})(?!\d)\s*(.*)$/)))            return Object.assign(base, { kind: 'time', secs: +m[1], desc: (m[2] + ' ' + ptext).trim() });
   if ((m = a.match(/^(\d+(?:\.\d+)?)\s*(min|mins|minutes?|sec|secs|seconds?)\b\.?\s*(.*)$/i)))
     return Object.assign(base, { kind: 'time', secs: /^m/i.test(m[2]) ? +m[1] * 60 : +m[1], desc: (m[3] + ' ' + ptext).trim() });
-  if ((m = a.match(/^(\d+)\s*[xX]\.?\s*(\d+(?:\.\d+)?)(?![\d:])(.*)$/))) return mkSet(base, +m[1], +m[2], m[3], ptext);
+  if ((m = a.match(/^(\d+)\s*[xX]\.?\s*(\d+(?:\.\d+)?)(?![\d:])(.*)$/))) return mkSet(base, +m[1], +m[2], m[3], ptext, opts.bare);
   if ((m = a.match(/^(\d+)\s*[xX](?!\.?\s*\d)\s*(.*)$/)))        return Object.assign(base, { kind: 'round', mult: +m[1], desc: m[2], ctxText: (m[2] + ' ' + ptext).trim() });
   if ((m = a.match(/^(\d+)\s*(?:rounds?|times)\b\s*(.*)$/i))) return Object.assign(base, { kind: 'round', mult: +m[1], desc: m[2], ctxText: (m[2] + ' ' + ptext).trim() });
   if ((m = a.match(/^(\d+(?:\.\d+)?)\s*(?:yds?|yards?|meters?|m|y)?(?![\w.:])\s*[-–:]?\s*(.*)$/i))) {
     const f = findInterval(m[2]);
     if (f.interval != null || f.restSecs != null) {                    // "300 on 5:00" = one rep with an interval
-      const s = mkSet(base, 1, +m[1], m[2], ptext); s.solo = true; return s;
+      const s = mkSet(base, 1, +m[1], m[2], ptext, false); s.solo = true; return s;
     }
     return Object.assign(base, { kind: 'dist', dist: +m[1], desc: (m[2] + ' ' + ptext).trim() });
   }
   if ((m = a.match(/^(.*?)(?:^|[\s:;,–-])(\d+)\s*[xX]\.?\s*(\d+(?:\.\d+)?)(?![\d:])(.*)$/)))
-    return mkSet(base, +m[2], +m[3], m[4], (m[1] + ' ' + ptext).trim());
+    return mkSet(base, +m[2], +m[3], m[4], (m[1] + ' ' + ptext).trim(), opts.bare);
   return Object.assign(base, { kind: 'text', ctxText: (a + ' ' + ptext).trim() });
 }
-function parseText(text) {
+function parseText(text, opts) {
   const raw = String(text || '').replace(/\t/g, '  ').split('\n');
   const out = []; let section = null, secId = 0, mode = null, hIndent = 0, base = null;
   const indentOf = l => (l.match(/^ */) || [''])[0].length;
@@ -596,68 +635,91 @@ function parseText(text) {
       return;
     }
     if (mode === 'indent' && !blank && indent <= hIndent) { section = null; mode = null; base = null; secId++; }
-    out.push(Object.assign({ i, raw: line, section, secId, base: mode === 'indent' ? base : null }, classify(line)));
+    out.push(Object.assign({ i, raw: line, section, secId, base: mode === 'indent' ? base : null }, classify(line, opts)));
   });
   return out;
 }
 
 /* ---------- evaluation ---------- */
 function evalWorkout(parsed, key, W) {
-  const stack = []; let yds = 0, secs = 0, lastBase = 0, shownS = -1;
-  const stats = newStats();
-  const per = new Array(parsed.length);
+  const stack = []; let lastBase = 0, shownS = -1;
+  const per = new Array(parsed.length), pend = {};
+  /* one set or distance line (or one piece of a line that holds several sets) */
+  const countOne = (Lp, mult, ctxs, easy, lst, linePaces) => {
+    const segs = Lp.kind === 'set' ? Lp.segs : [{ n: 1, desc: Lp.desc }];
+    let ly = 0, ls = 0, base = 0;
+    for (const sg of segs) {
+      let one;
+      if (Lp.kind === 'dist') one = Lp.dist / 100 * W.defSec;
+      else if (sg.interval != null && sg.intervals && sg.intervals.length > 1) {
+        const list = spreadIntervals(sg.intervals, sg.n);
+        one = list.reduce((x, y) => x + y, 0) / Math.max(1, sg.n);
+        list.forEach(iv => { const pc = Math.round(iv / (Lp.dist / 100)); if (!linePaces.includes(pc)) linePaces.push(pc); });
+      }
+      else if (sg.interval != null) one = (Lp.solo && sg.interval / (Lp.dist / 100) < 40) ? Lp.dist / 100 * sg.interval : sg.interval;
+      else if (sg.restSecs != null) one = Lp.dist / 100 * W.defSec * 0.85 + sg.restSecs;
+      else one = Lp.dist / 100 * W.defSec;
+      const y = sg.n * Lp.dist * mult;
+      ly += y; ls += sg.n * one * mult; base += sg.n * one;
+      if (Lp.cycle) cycleSlices(Lp.dist, Lp.cycle.pairs).forEach(c => tagInto(lst, c.y * sg.n * mult, c.word, [sg.desc].concat(ctxs), easy, W.dflt));
+      else tagInto(lst, y, sg.desc, ctxs, easy, W.dflt);
+    }
+    return { ly, ls, base };
+  };
   parsed.forEach((L, idx) => {
     if (L.kind === 'group') { stack.length = 0; per[idx] = { applies: true, hdr: true }; return; }
     const applies = !L.section || key === '*' || L.section.some(n => n.toLowerCase() === key);
     if (!applies) { per[idx] = { applies: false }; return; }
     if (L.kind === 'blank') { per[idx] = { applies: true, blank: true }; return; }
     while (stack.length && stack[stack.length - 1].indent >= L.indent) stack.pop();
-    const parent = stack[stack.length - 1];
     const mult = stack.reduce((p, f) => f.counted ? 1 : p * f.mult, 1);   // a set line restarts the multiplier for lines indented under it
     const easy = stack.some(f => f.easy);
     const ctxs = stack.map(f => f.ctx).filter(Boolean).reverse();
-    const note = false;
     const frame = { indent: L.indent, mult: 1, easy: false, counted: false, ctx: '' };
     const lst = newStats();
     let ly = 0, ls = 0; const linePaces = [];
-    if (!note) {
-      if (L.kind === 'round') { frame.mult = L.mult; frame.ctx = L.ctxText || ''; }
-      else if (L.kind === 'set' || L.kind === 'dist') {
-        const segs = L.kind === 'set' ? L.segs : [{ n: 1, desc: L.desc }];
-        let baseSecs = 0;
-        for (const sg of segs) {
-          let one;
-          if (L.kind === 'dist') one = L.dist / 100 * W.defSec;
-          else if (sg.interval != null && sg.intervals && sg.intervals.length > 1) {
-            const list = spreadIntervals(sg.intervals, sg.n);
-            one = list.reduce((a, b) => a + b, 0) / Math.max(1, sg.n);
-            list.forEach(iv => { const pc = Math.round(iv / (L.dist / 100)); if (!linePaces.includes(pc)) linePaces.push(pc); });
-          }
-          else if (sg.interval != null) one = (L.solo && sg.interval / (L.dist / 100) < 40) ? L.dist / 100 * sg.interval : sg.interval;
-          else if (sg.restSecs != null) one = L.dist / 100 * W.defSec * 0.85 + sg.restSecs;
-          else one = L.dist / 100 * W.defSec;
-          const y = sg.n * L.dist * mult;
-          ly += y; ls += sg.n * one * mult; baseSecs += sg.n * one;
-          if (L.cycle) cycleSlices(L.dist, L.cycle.pairs).forEach(s => tagInto(lst, s.y * sg.n * mult, s.word, [sg.desc].concat(ctxs), easy, W.dflt));
-          else tagInto(lst, y, sg.desc, ctxs, easy, W.dflt);
-        }
-        lastBase = baseSecs; frame.counted = (L.kind === 'set');     // a bare "500 Pace" can head a block of sets
-      } else if (L.kind === 'time') {
-        ls = L.secs * mult;
-        const tp = tagParts(L.desc);
-        if (!RESTISH.test(L.desc) && (SWIMMY.test(L.desc) || tp.stroke || tp.type || tp.intensity)) {
-          ly = round25(L.secs / W.defSec * 100) * mult; lastBase = L.secs;
-          frame.counted = true; tagInto(lst, ly, L.desc, ctxs, easy, W.dflt);
-        }
-      } else if (L.kind === 'text') {
-        if (/^partner(?:'?s)?\s+(?:swims?|goes|go)\b/i.test(L.a)) ls = lastBase * mult;
-        else { frame.ctx = L.ctxText || ''; if (/\b(?:warm[- ]?up|cool[- ]?down)\b/i.test(L.a)) frame.easy = true; }
+    if (L.kind === 'round') { frame.mult = L.mult; frame.ctx = L.ctxText || ''; }
+    else if (L.kind === 'set' || L.kind === 'dist') {
+      const r = countOne(L, mult, ctxs, easy, lst, linePaces); ly = r.ly; ls = r.ls; lastBase = r.base;
+      frame.counted = (L.kind === 'set');     // a bare "500 Pace" can head a block of sets
+    } else if (L.kind === 'multi') {          // several sets on one line, optionally "3x's: ..."
+      let base = 0;
+      for (const Lp of L.parts) { const r = countOne(Lp, mult * L.mult, ctxs, easy, lst, linePaces); ly += r.ly; ls += r.ls; base += r.base; }
+      lastBase = base; frame.counted = true;
+    } else if (L.kind === 'stated') {         // "Warm up: 900" – scaled to the stated total once its lines are known
+      for (const Lp of L.parts) { const r = countOne(Lp, mult, ctxs, easy, lst, linePaces); ly += r.ly; ls += r.ls; }
+      frame.ctx = L.ctxText || ''; pend[idx] = { ctxs, easy };
+    } else if (L.kind === 'time') {
+      ls = L.secs * mult;
+      const tp = tagParts(L.desc);
+      if (!RESTISH.test(L.desc) && (SWIMMY.test(L.desc) || tp.stroke || tp.type || tp.intensity)) {
+        ly = round25(L.secs / W.defSec * 100) * mult; lastBase = L.secs;
+        frame.counted = true; tagInto(lst, ly, L.desc, ctxs, easy, W.dflt);
       }
+    } else if (L.kind === 'text') {
+      if (/^partner(?:'?s)?\s+(?:swims?|goes|go)\b/i.test(L.a)) ls = lastBase * mult;
+      else { frame.ctx = L.ctxText || ''; if (/\b(?:warm[- ]?up|cool[- ]?down)\b/i.test(L.a)) frame.easy = true; }
     }
     stack.push(frame);
-    yds += ly; secs += ls; mergeStats(stats, lst);
-    per[idx] = { applies: true, ly, ls, note, mult, cumY: yds, cumS: secs, st: lst, paces: linePaces.length ? linePaces : undefined };
+    per[idx] = { applies: true, ly, ls, note: false, mult, st: lst, paces: linePaces.length ? linePaces : undefined };
   });
+  /* A stated yardage ("1st set: 500/1400") is the truth for that header and the lines under it. The lines keep their own
+     stroke / type / intensity mix and pace, scaled so the block adds up to the number the coach wrote. */
+  if (!W.noScale) {
+    for (const h of Object.keys(pend).map(Number).sort((x, y) => y - x)) {
+      const L = parsed[h]; let e = h;
+      for (let j = h + 1; j < parsed.length; j++) { const M = parsed[j], q = per[j]; if (!q.applies) continue; if (M.kind === 'group') break; if (M.kind === 'blank') continue; if (M.indent <= L.indent) break; e = j; }
+      let C = 0; for (let i = h; i <= e; i++) { const q = per[i]; if (q.applies && !q.blank && !q.hdr && !q.fixed) C += q.ly; }
+      if (C > 0) {
+        const k = L.stated / C;
+        for (let i = h; i <= e; i++) { const q = per[i]; if (!q.applies || q.blank || q.hdr || q.fixed) continue; q.ly *= k; q.ls *= k; for (const d of DIMS) for (const n in q.st[d]) q.st[d][n] *= k; q.fixed = true; }
+      } else {
+        const q = per[h]; q.ly = L.stated; q.ls = L.stated / 100 * W.defSec; tagInto(q.st, L.stated, L.desc, pend[h].ctxs, pend[h].easy, W.dflt); q.fixed = true;
+      }
+    }
+  }
+  let yds = 0, secs = 0; const stats = newStats();
+  parsed.forEach((L, idx) => { const q = per[idx]; if (!q.applies || q.blank || q.hdr) return; yds += q.ly; secs += q.ls; mergeStats(stats, q.st); q.cumY = yds; q.cumS = secs; });
   const idxs = parsed.map((_, i) => i).filter(i => per[i].applies && !per[i].blank);
   const rootIndent = Math.min(99, ...idxs.filter(i => !per[i].hdr && parsed[i].base == null).map(i => parsed[i].indent));
   idxs.forEach((i, k) => {
@@ -668,13 +730,26 @@ function evalWorkout(parsed, key, W) {
   });
   return { yds, secs, end: W.startSec + secs, stats, per };
 }
+const isRefSrc = x => /^(swimcoachjj|swimswam|photo)/i.test(x || '');
+const isRefWorkout = w => w.ref === true || isRefSrc(w.src);
+const refOpts = w => (isRefWorkout(w) || w.parse === 'ref') ? { ref: true, bare: true } : {};   // w.parse === 'ref': a practice that holds JJ-style lines but lives on your calendar
+function sourceOf(w) {
+  const x = w.src || '';
+  if (/^swimcoachjj/i.test(x)) return 'JJ (Instagram)';
+  if (/^swimswam/i.test(x)) return 'SwimSwam';
+  if (/^photo/i.test(x)) return 'Photos';
+  if (!x || x === 'commit-pdf' || x === 'claude-draft') return 'Millard North';
+  return x;
+}
+const postedDate = w => (w.jj && w.jj.origDate) || w.date;
+const isUndated = w => w.date === '2000-01-03' && isRefWorkout(w);
 function makeW(w) {
   const safe = (list, name, fb) => list.includes(name) ? name : (list.includes(fb) ? fb : (list[0] || fb));
   const dflt = { stroke: safe(ORDER.stroke, w.defStroke, 'Free'), type: safe(ORDER.type, w.defType, 'Swim'), intensity: safe(ORDER.intensity, w.defInt, 'Moderate') };
   return { defSec: w.defSec || 90, startSec: timeToSec(w.time), dflt };
 }
 function analyze(w) {
-  const parsed = parseText(w.text || '');
+  const parsed = parseText(w.text || '', refOpts(w));
   const seen = new Map();
   (w.groups || []).forEach(n => { const k = String(n).toLowerCase(); if (k && !seen.has(k)) seen.set(k, n); });
   parsed.forEach(L => { if (L.kind === 'group' && L.groups) L.groups.forEach(n => { const k = n.toLowerCase(); if (!seen.has(k)) seen.set(k, n); }); });
@@ -739,7 +814,7 @@ function shareList(map, total) {
   return Object.entries(map).filter(([, v]) => v > 0.01).map(([k, v]) => [k, v / total]).filter(([, f]) => f >= 0.05).sort((a, b) => b[1] - a[1]);
 }
 function extractSets(w) {
-  const P = parseText(w.text || ''), W = makeW(w);
+  const P = parseText(w.text || '', refOpts(w)), W = makeW(w);
   const rootIndent = Math.min(99, ...P.filter(L => L.kind !== 'blank' && L.kind !== 'group' && L.base == null).map(L => L.indent));
   const rootOf = l => l.base != null ? l.base : rootIndent;
   const firstTag = P.find(L => L.kind === 'group' && L.groups);
@@ -791,25 +866,36 @@ function paceTable(per100, extra, rest) {
 /*CORE-END*/
 
 /* ---------- storage ---------- */
-const BUILD = 'Pool Deck build 2026-11-16 (pace calculator, weight room, multi-interval sets)';
+const BUILD = 'Pool Deck build 2026-11-16b (reference library, JJ parsing, safer storage)';
 const KEY = 'pooldeck.v1';
 const defSettings = () => ({ v: 3, weekStart: 1, defSec: 90, unit: 'yards', pool: 25, startTime: '15:30', seeded: false, weekGroup: 'median',
   groupList: ['100s', '200Free', '200im', '500free', '50Free', '50and100free', 'Alternates', 'Autos', 'Metro', 'NonAutos', 'State', 'Varsity'],
   gClientId: '', gFolderName: 'Pool Deck PDFs', gFolderId: '', pdfOpts: { metrics: true, zero: false, notes: true } });
 let db, storageOK = true, saveTimer = null;
+let loadFailed = false;
 function loadDB() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) { const d = JSON.parse(raw); const st = Object.assign(defSettings(), d.settings);
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { storageOK = false; }
+  if (raw) {
+    try {
+      const d = JSON.parse(raw);
+      if (!d || typeof d !== 'object' || Array.isArray(d) || (d.workouts != null && typeof d.workouts !== 'object')) throw new Error('unexpected shape');
+      const st = Object.assign(defSettings(), d.settings);
       if (!d.settings || d.settings.v !== 3) st.weekGroup = 'median';
       st.v = 3; st.pdfOpts = Object.assign({ metrics: true, zero: false, notes: true }, st.pdfOpts);
-      return { workouts: d.workouts || {}, groupColors: d.groupColors || {}, settings: st }; }
-  } catch (e) { storageOK = false; }
+      return { workouts: d.workouts || {}, groupColors: d.groupColors || {}, settings: st };
+    } catch (e) {
+      loadFailed = true;      // keep what is there exactly as it is, and do not write over it
+      try { if (!localStorage.getItem(KEY + '.unreadable')) localStorage.setItem(KEY + '.unreadable', raw); } catch (e2) {}
+    }
+  }
   return { workouts: {}, groupColors: {}, settings: defSettings() };
 }
+function keepSafetyCopy() { try { const raw = localStorage.getItem(KEY); if (raw) localStorage.setItem(KEY + '.before-change', raw); } catch (e) {} }
 function setStatus(msg, bad) { const s = document.getElementById('status'); if (!s) return; s.textContent = msg; s.classList.toggle('bad', !!bad); }
 function saveDB() {
   clearTimeout(saveTimer); saveTimer = null;
+  if (loadFailed) { setStatus('Not saved – your saved practices could not be read. Open Settings & backup.', true); return; }
   try { localStorage.setItem(KEY, JSON.stringify(db)); setStatus(storageOK ? 'Saved' : ''); }
   catch (e) { storageOK = false; setStatus('Not saved – browser storage is blocked. Use Settings › Download backup.', true); }
 }
@@ -828,12 +914,13 @@ const allWorkouts = () => Object.values(db.workouts);
 const hasWeights = w => !!(w.weights || '').trim();
 const hasSwim = w => !!(w.text || '').trim();
 const dispTitle = w => w.title || (hasWeights(w) && !hasSwim(w) ? 'Weight room' : 'Untitled practice');
+const calWorkouts = () => allWorkouts().filter(w => !isRefWorkout(w));   // reference practices (JJ, SwimSwam, photos) stay off the calendar
 function workoutsOn(date) {
-  return allWorkouts().filter(w => w.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || '') || (a.created || 0) - (b.created || 0));
+  return calWorkouts().filter(w => w.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || '') || (a.created || 0) - (b.created || 0));
 }
 function allGroups() {
   const m = new Map();
-  allWorkouts().forEach(w => groupNamesIn(w.text).forEach(n => { if (!m.has(n.toLowerCase())) m.set(n.toLowerCase(), n); }));
+  calWorkouts().forEach(w => groupNamesIn(w.text).forEach(n => { if (!m.has(n.toLowerCase())) m.set(n.toLowerCase(), n); }));
   return [...m.entries()].map(([key, name]) => ({ key, name }));
 }
 function newWorkout(date) {
@@ -941,7 +1028,7 @@ function renderWeek(ws) {
   const count = data.reduce((a, d) => a + d.items.length, 0);
   const stats = sumStats(data.flatMap(d => d.items.map(x => x.r.stats)));
   const mDate = pdate(ws);
-  const monthYds = allWorkouts().filter(w => { const d = pdate(w.date); return d.getMonth() === mDate.getMonth() && d.getFullYear() === mDate.getFullYear(); })
+  const monthYds = calWorkouts().filter(w => { const d = pdate(w.date); return d.getMonth() === mDate.getMonth() && d.getFullYear() === mDate.getFullYear(); })
     .reduce((a, w) => a + pick(analyze(w), sel).yds, 0);
   const a = pdate(ws), b = pdate(addDays(ws, 6));
   const range = a.getMonth() === b.getMonth() ? `${MON[a.getMonth()]} ${a.getDate()} – ${b.getDate()}` : `${MON[a.getMonth()]} ${a.getDate()} – ${MON[b.getMonth()]} ${b.getDate()}`;
@@ -1070,13 +1157,14 @@ function renderEditor(w) {
   app.onclick = null;
   app.innerHTML = `
   <div class="ed-top">
-    <a class="btn" href="#/week/${w.date}">‹ Week</a>
+    <a class="btn" href="${isRefWorkout(w) ? '#/search' : '#/week/' + w.date}">‹ ${isRefWorkout(w) ? 'Practices' : 'Week'}</a>
     <input type="text" class="title" id="f-title" placeholder="Practice title" aria-label="Practice title" value="${esc(w.title)}">
     <button class="btn" id="b-sets">Find a set…</button>
     <button class="btn" id="b-copy">Copy to date…</button>
     <button class="btn" id="b-print">Save / print…</button>
     <button class="btn danger" id="b-del">Delete</button>
   </div>
+  ${isRefWorkout(w) ? `<p class="refnote">Reference practice from <b>${esc(sourceOf(w))}</b>${isUndated(w) ? ', undated' : ', posted ' + fmtLong(postedDate(w))}. It stays off your calendar and out of your week and month totals. Use <b>Copy to date…</b> to put a copy on your calendar.</p>` : ''}
   <div class="meta">
     <label class="f">Date<input type="date" id="f-date" value="${w.date}"></label>
     <label class="f">Start time<input type="time" id="f-time" value="${esc(w.time || '15:30')}"></label>
@@ -1293,12 +1381,13 @@ function groupDialog(w, ta) {
 }
 function copyDialog(w) {
   dialog(`<h2>Copy practice</h2>
-    <label class="f">Copy to date<input type="date" id="cp-date" value="${addDays(w.date, 7)}"></label>
+    <label class="f">Copy to date<input type="date" id="cp-date" value="${isRefWorkout(w) ? todayStr() : addDays(w.date, 7)}"></label>
     <div class="foot"><button class="btn" id="cp-no">Cancel</button><button class="btn primary" id="cp-yes">Copy</button></div>`, d => {
     d.querySelector('#cp-no').onclick = closeDlg;
     d.querySelector('#cp-yes').onclick = () => {
       const date = d.querySelector('#cp-date').value; if (!date) return;
       const c = Object.assign({}, w, { id: uid(), date, created: Date.now() }); delete c._update;
+      if (isRefWorkout(c)) { for (const k of ['src', 'jj', 'swimswam', 'ref', 'edited']) delete c[k]; c.groups = (c.groups || []).filter(n => !/^(swimcoachjj|swimswam)/i.test(n)); c.parse = 'ref'; }   // a copy on your calendar is a normal practice that still reads the original notation
       db.workouts[c.id] = c; saveDB(); closeDlg(); toast(`Copied to ${fmtShort(date)}`);
     };
   });
@@ -1647,7 +1736,7 @@ function paceDialog() {
 function seasonOf(d) { const [y, m] = d.split('-').map(Number); const st = m >= 8 ? y : y - 1; return `${st}-${String((st + 1) % 100).padStart(2, '0')}`; }
 function seasonMeta() {
   const starts = {}, ends = {};
-  allWorkouts().forEach(w => { const s = seasonOf(w.date), ws = weekStartOf(w.date, db.settings.weekStart); if (!starts[s] || ws < starts[s]) starts[s] = ws; if (!ends[s] || ws > ends[s]) ends[s] = ws; });
+  allWorkouts().forEach(w => { if (isUndated(w)) return; const s = seasonOf(w.date), ws = weekStartOf(w.date, db.settings.weekStart); if (!starts[s] || ws < starts[s]) starts[s] = ws; if (!ends[s] || ws > ends[s]) ends[s] = ws; });
   return { starts, ends };
 }
 const weeksBetween = (a, b) => Math.round((pdate(b) - pdate(a)) / 604800000);
@@ -1656,7 +1745,8 @@ function seasonPos(date, meta) {
   const wk = weeksBetween(meta.starts[s], ws) + 1, n = weeksBetween(meta.starts[s], meta.ends[s]) + 1, third = Math.ceil(n / 3);
   return { season: s, wk, n, part: wk <= third ? 'Early' : wk > n - third ? 'Late' : 'Middle', final: wk > n - 2 };
 }
-function seasonMatch(st, date, meta) {
+function seasonMatch(st, date, meta, undated) {
+  if (undated) return !(st.season || st.wmin !== '' || st.wmax !== '' || st.from || st.to || st.parts.size);   // undated sets match only when no date filter is set
   const pos = seasonPos(date, meta);
   if (st.season && pos.season !== st.season) return false;
   if (st.wmin !== '' && pos.wk < +st.wmin) return false;
@@ -1666,8 +1756,24 @@ function seasonMatch(st, date, meta) {
   if (st.parts.size && ![...st.parts].some(p => p === 'Final' ? pos.final : pos.part === p)) return false;
   return true;
 }
-function seasonFiltersHTML(st, meta) {
-  const seasons = Object.keys(meta.starts).sort().reverse();
+function availableSeasons(sources) {
+  const set = new Set();
+  allWorkouts().forEach(w => { if (isUndated(w)) return; if (sources && sources.size && !sources.has(sourceOf(w))) return; set.add(seasonOf(w.date)); });
+  return [...set].sort().reverse();
+}
+const SRC_ORDER = ['Millard North', 'JJ (Instagram)', 'SwimSwam', 'Photos'];
+function sourceChipsHTML(counts, selected) {
+  const names = Object.keys(counts).sort((a, b) => { const ia = SRC_ORDER.indexOf(a), ib = SRC_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
+  if (names.length < 2) return '';
+  return `<div class="f"><span>Source</span><span class="chipsrow">${names.map(n => `<button type="button" class="fchip${selected.has(n) ? ' on' : ''}" data-src="${esc(n)}">${esc(n)} <em>${fmtNum(counts[n])}</em></button>`).join('')}</span></div>`;
+}
+function refreshSeasonOptions(root, st) {
+  const sel = root.querySelector('select[data-f=season]'); if (!sel) return;
+  const list = availableSeasons(st.sources); if (st.season && !list.includes(st.season)) st.season = '';
+  sel.innerHTML = '<option value="">All seasons</option>' + list.map(x => `<option value="${x}"${st.season === x ? ' selected' : ''}>${x}</option>`).join('');
+}
+function seasonFiltersHTML(st, meta, seasons) {
+  seasons = seasons || Object.keys(meta.starts).sort().reverse();
   const lbl = { Early: 'Early', Middle: 'Middle', Late: 'Late', Final: 'Last 2 weeks' };
   return `<div class="frow">
     <label class="f">Season<select data-f="season"><option value="">All seasons</option>${seasons.map(x => `<option value="${x}"${st.season === x ? ' selected' : ''}>${x}</option>`).join('')}</select></label>
@@ -1678,19 +1784,23 @@ function seasonFiltersHTML(st, meta) {
 }
 
 /* ---------- set library ---------- */
-const libState = { q: '', sort: 'new', dedupe: true, dmin: '', dmax: '', tmin: '', tmax: '', season: '', wmin: '', wmax: '', from: '', to: '', limit: 30,
+const libState = { q: '', sort: 'new', dedupe: true, dmin: '', dmax: '', tmin: '', tmax: '', season: '', wmin: '', wmax: '', from: '', to: '', limit: 30, sources: new Set(),
   chips: { type: new Set(), stroke: new Set(), intensity: new Set(), equip: new Set(), part: new Set() }, parts: new Set() };
 function resetLib() {
   Object.assign(libState, { q: '', sort: 'new', dedupe: true, dmin: '', dmax: '', tmin: '', tmax: '', season: '', wmin: '', wmax: '', from: '', to: '', limit: 30 });
-  for (const k in libState.chips) libState.chips[k] = new Set(); libState.parts = new Set();
+  for (const k in libState.chips) libState.chips[k] = new Set(); libState.parts = new Set(); libState.sources = new Set();
 }
 const setCache = new Map();
 function setIndex() {
   const out = [];
   for (const w of allWorkouts()) {
-    const sig = [w.text, w.title, w.date, w.time, w.defSec, w.defStroke, w.defType, w.defInt, (w.groups || []).join(','), VOCAB_VER].join('|');
+    const sig = [w.text, w.title, w.date, w.time, w.defSec, w.defStroke, w.defType, w.defInt, (w.groups || []).join(','), w.src || '', w.parse || '', VOCAB_VER].join('|');
     let c = setCache.get(w.id);
-    if (!c || c.sig !== sig) { c = { sig, sets: extractSets(w) }; setCache.set(w.id, c); }
+    if (!c || c.sig !== sig) {
+      const sets = extractSets(w), src = sourceOf(w), ref = isRefWorkout(w), und = isUndated(w), posted = postedDate(w);
+      sets.forEach(x => { x.source = src; x.ref = ref; x.undated = und; x.posted = posted; });
+      c = { sig, sets }; setCache.set(w.id, c);
+    }
     for (const x of c.sets) out.push(x);
   }
   for (const id of [...setCache.keys()]) if (!db.workouts[id]) setCache.delete(id);
@@ -1707,13 +1817,14 @@ function libFilter(all, st, meta) {
     for (const dim of ['type', 'stroke', 'intensity', 'equip']) if (st.chips[dim].size && ![...st.chips[dim]].some(n => has(s, dim, n))) return false;
     if (st.chips.part.size && !st.chips.part.has(s.part)) return false;
     if (q.length) { const hay = (s.text + ' ' + s.title + ' ' + s.groups.join(' ')).toLowerCase(); if (!q.every(x => hay.includes(x))) return false; }
-    return seasonMatch(st, s.date, meta);
+    if (st.sources.size && !st.sources.has(s.source)) return false;
+    return seasonMatch(st, s.date, meta, s.undated);
   });
 }
 function dedupeSets(list) {
   const m = new Map();
   for (const s of list) {
-    const k = normSet(s.text), e = m.get(k);
+    const k = s.source + '|' + normSet(s.text), e = m.get(k);
     if (!e) m.set(k, Object.assign({}, s, { n: 1, oldest: s.date }));
     else { e.n++; if (s.date > e.date) Object.assign(e, s, { n: e.n, oldest: e.oldest }); if (s.date < e.oldest) e.oldest = s.date; }
   }
@@ -1726,7 +1837,8 @@ function applyLibPreset(p) {
 }
 function libraryView(host, opts) {
   const st = libState, all = setIndex(), meta = seasonMeta(), ua = unitAbbr(db.settings.unit);
-  const counts = { type: {}, stroke: {}, intensity: {}, equip: {}, part: {} };
+  const counts = { type: {}, stroke: {}, intensity: {}, equip: {}, part: {} }, srcCounts = {};
+  all.forEach(s => { srcCounts[s.source] = (srcCounts[s.source] || 0) + 1; });
   all.forEach(s => { for (const dim of ['type', 'stroke', 'intensity', 'equip']) s.tags[dim].forEach(([n, f]) => { if (f >= 0.5) counts[dim][n] = (counts[dim][n] || 0) + 1; }); counts.part[s.part] = (counts.part[s.part] || 0) + 1; });
   const chipRow = (dim, label, names) => { const list = names.filter(n => counts[dim][n]); return list.length ? `<div class="f"><span>${label}</span><span class="chipsrow">${list.map(n => `<button type="button" class="fchip${st.chips[dim].has(n) ? ' on' : ''}" data-chip="${dim}:${esc(n)}">${esc(n)} <em>${counts[dim][n]}</em></button>`).join('')}</span></div>` : ''; };
   const sorts = [['new', 'Newest first'], ['old', 'Oldest first'], ['long', 'Longest first'], ['short', 'Shortest first'], ['time', 'Most time first'], ['repeat', 'Most repeated']];
@@ -1737,18 +1849,19 @@ function libraryView(host, opts) {
       <label class="chk"><input type="checkbox" data-c="dedupe"${st.dedupe ? ' checked' : ''}> Hide repeats</label></div>
     <div class="frow"><label class="f">Distance (${ua})<span class="rng"><input type="number" min="0" data-f="dmin" value="${esc(st.dmin)}" placeholder="from"><i>–</i><input type="number" min="0" data-f="dmax" value="${esc(st.dmax)}" placeholder="to"></span></label>
       <label class="f">Time (minutes)<span class="rng"><input type="number" min="0" data-f="tmin" value="${esc(st.tmin)}" placeholder="from"><i>–</i><input type="number" min="0" data-f="tmax" value="${esc(st.tmax)}" placeholder="to"></span></label></div>
-    ${chipRow('type', 'Type', ORDER.type)}${chipRow('stroke', 'Stroke', ORDER.stroke)}${chipRow('intensity', 'Intensity', ORDER.intensity)}${chipRow('equip', 'Equipment', ORDER.equip)}${chipRow('part', 'Part of practice', ['Warm-up', 'Main', 'Cool-down'])}
-    ${seasonFiltersHTML(st, meta)}
+    ${sourceChipsHTML(srcCounts, st.sources)}${chipRow('type', 'Type', ORDER.type)}${chipRow('stroke', 'Stroke', ORDER.stroke)}${chipRow('intensity', 'Intensity', ORDER.intensity)}${chipRow('equip', 'Equipment', ORDER.equip)}${chipRow('part', 'Part of practice', ['Warm-up', 'Main', 'Cool-down'])}
+    ${seasonFiltersHTML(st, meta, availableSeasons(st.sources))}
     <div class="frow"><button class="btn sm" id="lib-clear" type="button">Clear filters</button><span id="lib-count" class="muted" role="status"></span></div>
   </div><div id="lib-res"></div>`;
   const res = host.querySelector('#lib-res'), countEl = host.querySelector('#lib-count');
   let shown = [];
   const card = (s, k) => {
-    const pos = seasonPos(s.date, meta), mins = s.secs / 60, pace = s.yards > 0 && s.secs > 0 ? fmtMS(s.secs / s.yards * 100) : '';
+    const pos = s.undated ? null : seasonPos(s.date, meta), mins = s.secs / 60, pace = s.yards > 0 && s.secs > 0 ? fmtMS(s.secs / s.yards * 100) : '';
     const tag = (dim, min) => s.tags[dim].filter(([, f]) => f >= min).slice(0, 2).map(([n, f]) => `<span class="tg" style="--tc:${COLORS[dim][n] || '#7D8F9B'}">${esc(n)}${f < 0.95 ? ' ' + Math.round(f * 100) + '%' : ''}</span>`).join('');
-    const rep = s.n > 1 ? `<span class="rep">Used ${s.n}× · ${seasonOf(s.oldest)} to ${seasonOf(s.date)}</span>` : '';
+    const rep = s.n > 1 ? `<span class="rep">Used ${s.n}×${s.ref ? '' : ' · ' + seasonOf(s.oldest) + ' to ' + seasonOf(s.date)}</span>` : '';
+    const where = s.ref ? ` · ${esc(s.source)}${s.undated ? ' · undated' : ' · posted ' + fmtLong(s.posted)}` : ` · ${fmtLong(s.date)} · Week ${pos.wk}, ${pos.season}`;
     return `<article class="setcard"><header><b class="num">${fmtNum(s.yards)}</b> ${ua} · ${fmtDur(s.secs)}${pace ? ` · ${pace}/100` : ''}
-      <span class="muted"> · ${fmtLong(s.date)} · ${esc(s.title || 'Untitled')} · Week ${pos.wk}, ${pos.season}${s.groups.length ? ' · ' + esc(s.groups.join(', ')) : ''}</span>${rep}</header>
+      <span class="muted">${where} · ${esc(s.title || 'Untitled')}${s.groups.length ? ' · ' + esc(s.groups.join(', ')) : ''}</span>${rep}</header>
       <div class="tgs">${tag('type', 0.3)}${tag('stroke', 0.3)}${tag('intensity', 0.3)}${tag('equip', 0.3)}${s.part !== 'Main' ? `<span class="tg" style="--tc:#7D8F9B">${s.part}</span>` : ''}</div>
       <pre class="stext">${esc(s.text)}</pre>
       <div class="acts">${opts.insert ? `<button class="btn sm primary" data-act="ins" data-k="${k}" type="button">Insert</button>` : `<button class="btn sm primary" data-act="add" data-k="${k}" type="button">Add to a practice…</button>`}
@@ -1766,16 +1879,17 @@ function libraryView(host, opts) {
   host.oninput = e => { const f = e.target.dataset && e.target.dataset.f; if (f) { st[f] = e.target.value; st.limit = 30; draw(); } };
   host.onchange = e => { if (e.target.dataset && e.target.dataset.c === 'dedupe') { st.dedupe = e.target.checked; st.limit = 30; draw(); } };
   host.onclick = e => {
-    const chip = e.target.closest('[data-chip]'), part = e.target.closest('[data-part]'), act = e.target.closest('[data-act]');
+    const chip = e.target.closest('[data-chip]'), part = e.target.closest('[data-part]'), act = e.target.closest('[data-act]'), srcBtn = e.target.closest('[data-src]');
+    if (srcBtn) { const n = srcBtn.dataset.src; st.sources.has(n) ? st.sources.delete(n) : st.sources.add(n); srcBtn.classList.toggle('on'); refreshSeasonOptions(host, st); st.limit = 30; draw(); return; }
     if (chip) { const [dim, ...nm] = chip.dataset.chip.split(':'), name = nm.join(':'), set = st.chips[dim]; set.has(name) ? set.delete(name) : set.add(name); chip.classList.toggle('on'); st.limit = 30; draw(); return; }
     if (part) { st.parts.has(part.dataset.part) ? st.parts.delete(part.dataset.part) : st.parts.add(part.dataset.part); part.classList.toggle('on'); st.limit = 30; draw(); return; }
     if (e.target.closest('#lib-clear')) { resetLib(); libraryView(host, opts); return; }
     if (e.target.closest('#lib-more')) { st.limit += 30; draw(); return; }
     if (!act) return;
     const s = shown[+act.dataset.k]; if (!s) return;
-    if (act.dataset.act === 'ins') opts.insert(s.text);
+    if (act.dataset.act === 'ins') opts.insert(s.text, s);
     else if (act.dataset.act === 'copy') { (navigator.clipboard ? navigator.clipboard.writeText(s.text) : Promise.reject()).then(() => toast('Set copied'), () => toast('Could not copy – select the text instead')); }
-    else if (act.dataset.act === 'add') addToPracticeDialog(s.text);
+    else if (act.dataset.act === 'add') addToPracticeDialog(s.text, s.ref);
     else if (act.dataset.act === 'open') { closeDlg(); go('#/edit/' + s.wid); }
   };
   draw();
@@ -1789,7 +1903,12 @@ function openLibraryDialog(ta, preset) {
   if (preset) applyLibPreset(preset);
   dialog(`<div class="libhead"><h2>Find a set</h2><button class="btn sm" id="lib-x" type="button">Close</button></div><div id="libhost"></div>`, d => {
     d.querySelector('#lib-x').onclick = closeDlg;
-    libraryView(d.querySelector('#libhost'), { insert: txt => { closeDlg(); insertSet(ta, txt); toast('Set inserted'); } });
+    libraryView(d.querySelector('#libhost'), { insert: (txt, set) => {
+      closeDlg(); insertSet(ta, txt);
+      const w = state.cur;
+      if (w && set && set.ref && !isRefWorkout(w) && w.parse !== 'ref') { w.parse = 'ref'; saveSoon(); if (w._update) w._update(); toast('Set inserted. This practice now also reads JJ-style notation (like “1st set: 500/1400”).'); }
+      else toast('Set inserted');
+    } });
   }, 'wide');
 }
 /* put a set at the cursor, indented to match where it lands */
@@ -1811,7 +1930,7 @@ function insertSet(ta, text) {
   if (cur.trim()) { ta.setSelectionRange(le, le); insertText(ta, '\n' + block); }
   else { ta.setSelectionRange(ls, le); insertText(ta, block); }
 }
-function addToPracticeDialog(text) {
+function addToPracticeDialog(text, isRefSet) {
   dialog(`<h2>Add this set to a practice</h2>
     <label class="f">Date<input type="date" id="ap-date" value="${todayStr()}"></label>
     <div id="ap-list" class="cbs" style="grid-template-columns:1fr"></div>
@@ -1823,35 +1942,39 @@ function addToPracticeDialog(text) {
     d.querySelector('#ap-yes').onclick = () => {
       const pick_ = d.querySelector('input[name=ap]:checked'); if (!pick_ || !dt.value) return;
       const w = pick_.value === 'new' ? newWorkout(dt.value) : db.workouts[pick_.value];
-      w.text = ((w.text || '').replace(/\s+$/, '') + (w.text && w.text.trim() ? '\n\n' : '') + text + '\n'); saveDB(); closeDlg(); toast('Set added'); go('#/edit/' + w.id);
+      w.text = ((w.text || '').replace(/\s+$/, '') + (w.text && w.text.trim() ? '\n\n' : '') + text + '\n');
+      if (isRefSet && !isRefWorkout(w)) w.parse = 'ref';
+      saveDB(); closeDlg(); toast('Set added'); go('#/edit/' + w.id);
     };
   });
 }
 
 /* ---------- practice search (with season filters) ---------- */
-const searchState = { q: '', sort: 'new', season: '', wmin: '', wmax: '', from: '', to: '', parts: new Set() };
+const searchState = { q: '', sort: 'new', season: '', wmin: '', wmax: '', from: '', to: '', parts: new Set(), sources: new Set() };
 function renderSearch() {
   app.onclick = null;
-  const st = searchState, meta = seasonMeta();
+  const st = searchState, meta = seasonMeta(), srcCounts = {};
+  allWorkouts().forEach(w => { const x = sourceOf(w); srcCounts[x] = (srcCounts[x] || 0) + 1; });
   app.innerHTML = `<div class="wk-head"><h1>Practices</h1></div><div class="card libpage"><div class="libbar">
     <div class="frow"><label class="f grow">Words in the title or sets<input type="search" id="q" data-f="q" value="${esc(st.q)}" placeholder="e.g. state week, descend, 200 free"></label>
       <label class="f">Sort<select data-f="sort"><option value="new"${st.sort === 'new' ? ' selected' : ''}>Newest first</option><option value="old"${st.sort === 'old' ? ' selected' : ''}>Oldest first</option></select></label></div>
-    ${seasonFiltersHTML(st, meta)}
+    ${sourceChipsHTML(srcCounts, st.sources)}
+    ${seasonFiltersHTML(st, meta, availableSeasons(st.sources))}
     <div class="frow"><button class="btn sm" id="s-clear" type="button">Clear filters</button><span id="s-count" class="muted" role="status"></span></div></div></div>
     <div class="card" id="res" style="margin-top:14px"></div>`;
   const res = document.getElementById('res'), cnt = document.getElementById('s-count');
   function run() {
     const q = st.q.trim().toLowerCase();
-    let list = allWorkouts().filter(w => (!q || (w.title + '\n' + w.text + '\n' + (w.weights || '')).toLowerCase().includes(q)) && seasonMatch(st, w.date, meta));
+    let list = allWorkouts().filter(w => (!q || (w.title + '\n' + w.text + '\n' + (w.weights || '')).toLowerCase().includes(q)) && (!st.sources.size || st.sources.has(sourceOf(w))) && seasonMatch(st, w.date, meta, isUndated(w)));
     list.sort((a, b) => (st.sort === 'old' ? 1 : -1) * (a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')));
     cnt.textContent = `${fmtNum(list.length)} ${list.length === 1 ? 'practice' : 'practices'}`;
     if (!list.length) { res.innerHTML = `<div class="empty">${allWorkouts().length ? 'No practices match.' : 'No practices yet. Add one from the Week page.'}</div>`; return; }
     res.innerHTML = list.slice(0, 100).map(w => {
-      const A = analyze(w), r = pick(A, 'median'), pos = seasonPos(w.date, meta);
+      const A = analyze(w), r = pick(A, 'median'), pos = isUndated(w) ? null : seasonPos(w.date, meta), isRef = isRefWorkout(w);
       let snip = '';
       if (q) { const line = ((w.text || '') + '\n' + (w.weights || '')).split('\n').find(l => l.toLowerCase().includes(q)); if (line) snip = esc(line.trim()).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), m => `<mark>${m}</mark>`); }
       else snip = esc((w.text || '').split('\n').filter(l => l.trim()).slice(0, 3).join('  ·  '));
-      return `<div class="sr-row"><div><b>${fmtShort(w.date)}</b><div class="muted" style="font-size:13px">${fmtNum(Math.round(r.yds))} ${unitAbbr(w.unit)} · Wk ${pos.wk}, ${pos.season}</div></div>
+      return `<div class="sr-row"><div><b>${isRef ? (isUndated(w) ? 'Undated' : fmtLong(postedDate(w))) : fmtShort(w.date)}</b><div class="muted" style="font-size:13px">${fmtNum(Math.round(r.yds))} ${unitAbbr(w.unit)} · ${isRef ? esc(sourceOf(w)) : 'Wk ' + pos.wk + ', ' + pos.season}</div></div>
         <div style="min-width:0"><div style="font-weight:500">${esc(dispTitle(w))}</div><div class="snip">${snip}</div></div>
         <div style="display:flex;gap:6px"><button class="btn sm" data-open="${w.id}">Open</button><button class="btn sm" data-copy="${w.id}">Copy to…</button></div></div>`;
     }).join('') + (list.length > 100 ? `<div class="empty">Showing the 100 most recent matches. Narrow the filters to see more.</div>` : '');
@@ -1859,9 +1982,10 @@ function renderSearch() {
   const bar = app.querySelector('.libbar');
   bar.oninput = e => { const f = e.target.dataset && e.target.dataset.f; if (f) { st[f] = e.target.value; run(); } };
   bar.onclick = e => {
-    const part = e.target.closest('[data-part]');
+    const part = e.target.closest('[data-part]'), srcBtn = e.target.closest('[data-src]');
+    if (srcBtn) { const n = srcBtn.dataset.src; st.sources.has(n) ? st.sources.delete(n) : st.sources.add(n); srcBtn.classList.toggle('on'); refreshSeasonOptions(bar, st); run(); return; }
     if (part) { st.parts.has(part.dataset.part) ? st.parts.delete(part.dataset.part) : st.parts.add(part.dataset.part); part.classList.toggle('on'); run(); return; }
-    if (e.target.closest('#s-clear')) { Object.assign(st, { q: '', sort: 'new', season: '', wmin: '', wmax: '', from: '', to: '' }); st.parts = new Set(); renderSearch(); }
+    if (e.target.closest('#s-clear')) { Object.assign(st, { q: '', sort: 'new', season: '', wmin: '', wmax: '', from: '', to: '' }); st.parts = new Set(); st.sources = new Set(); renderSearch(); }
   };
   res.onclick = e => {
     const o = e.target.closest('[data-open]'), c = e.target.closest('[data-copy]');
@@ -1877,12 +2001,13 @@ function download(name, text, type) {
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 function csvText() {
-  const rows = [['Date', 'Practice', 'Group', 'Distance', 'Unit', 'Minutes']];
+  const rows = [['Date', 'Practice', 'Group', 'Distance', 'Unit', 'Minutes', 'Source']];
   allWorkouts().sort((a, b) => a.date.localeCompare(b.date)).forEach(w => analyze(w).items.forEach(it =>
-    rows.push([w.date, w.title, it.name || 'Everyone', Math.round(it.res.yds * 10) / 10, unitWord(w.unit), Math.round(it.res.secs / 60)])));
+    rows.push([w.date, w.title, it.name || 'Everyone', Math.round(it.res.yds * 10) / 10, unitWord(w.unit), Math.round(it.res.secs / 60), sourceOf(w)])));
   return rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
 function mergeBackup(d2) {
+  loadFailed = false;
   /* same date + title + start time = same practice. Practices that came from a Commit PDF import are refreshed;
      anything you wrote or edited yourself is never overwritten. */
   const keyOf = w => [w.date, (w.title || '').trim().toLowerCase(), w.time || ''].join('|');
@@ -1971,19 +2096,20 @@ function settingsDialog() {
       const f = e.target.files[0]; if (!f) return;
       readJsonFile(f, d2 => {
         if (!confirm(`Replace everything here with the backup (${Object.keys(d2.workouts).length} practices)?`)) return;
+        keepSafetyCopy(); loadFailed = false;
         db = { workouts: d2.workouts, groupColors: d2.groupColors || {}, settings: Object.assign(defSettings(), d2.settings) };
         applyVocab(db.settings.vocab);
         saveDB(); closeDlg(); toast('Backup restored'); route();
       });
     };
-    q('#s-wipe').onclick = () => { if (confirm('Delete every practice? This cannot be undone. Download a backup first if unsure.')) { db.workouts = {}; saveDB(); closeDlg(); route(); } };
+    q('#s-wipe').onclick = () => { if (confirm('Delete every practice? This cannot be undone. Download a backup first if unsure.')) { keepSafetyCopy(); db.workouts = {}; saveDB(); closeDlg(); route(); } };
   });
 }
 
 /* ---------- start ---------- */
 db = loadDB();
 applyVocab(db.settings.vocab);
-if (!db.settings.seeded && Object.keys(db.workouts).length === 0) { const w = sampleWorkout(todayStr()); db.workouts[w.id] = w; }
+if (!loadFailed && !db.settings.seeded && Object.keys(db.workouts).length === 0) { const w = sampleWorkout(todayStr()); db.workouts[w.id] = w; }
 db.settings.seeded = true;
 saveDB();
 if (!storageOK) setStatus('Browser storage is blocked – changes will not be kept. Use Settings › Download backup.', true);
@@ -1994,6 +2120,13 @@ window.addEventListener('hashchange', route);
 window.addEventListener('beforeunload', () => { if (saveTimer) saveDB(); });
 window.addEventListener('afterprint', () => { document.getElementById('printRoot').innerHTML = ''; });
 route();
+if (loadFailed) dialog(`<h2>Your saved practices couldn’t be read</h2>
+  <p style="margin:0">Pool Deck found saved data in this browser but couldn’t open it. Nothing has been changed or deleted. An untouched copy is kept in this browser as <b>${KEY}.unreadable</b>, and nothing new will be saved until you choose.</p>
+  <p style="margin:0">If you have a backup file, restore it now.</p>
+  <div class="foot"><button class="btn" id="ur-fresh" type="button">Start with an empty app</button><button class="btn primary" id="ur-restore" type="button">Restore from a backup…</button></div>`, d => {
+  d.querySelector('#ur-fresh').onclick = () => { loadFailed = false; db.settings.seeded = true; saveDB(); closeDlg(); route(); };
+  d.querySelector('#ur-restore').onclick = () => { closeDlg(); settingsDialog(); };
+});
 </script>
 </body>
 </html>
