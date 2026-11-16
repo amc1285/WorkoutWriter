@@ -216,6 +216,17 @@ dialog.wide{width:min(1000px,calc(100% - 20px))}
 .pctable td:nth-child(2){font-weight:600}
 .pctable tr.on{background:var(--aqua-tint)}
 .refnote{margin:0 0 12px;padding:9px 13px;border:1px solid var(--line-strong);border-radius:6px;background:var(--aqua-tint);font-size:14.5px}
+.wk-head label.f{max-width:100%;min-width:0}
+.wk-head select{min-width:0;max-width:100%;flex:1 1 auto}
+@media (max-width:640px){.wk-head label.f{flex:1 1 100%}.wk-head h1{font-size:28px}}
+.prac.off{opacity:.55}
+.prac.off .py{color:var(--muted)}
+.notin{display:inline-block;margin-left:8px;padding:0 8px;border:1px dashed var(--line-strong);border-radius:99px;font-size:12px;font-style:normal;color:var(--muted);vertical-align:1px}
+.gpbox{border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:15px;color:var(--ink)}
+.gpbox summary{cursor:pointer;color:var(--ink);font-weight:500}
+.gplist{display:grid;grid-template-columns:1fr;gap:6px;max-height:250px;overflow:auto;padding-right:4px}
+.gprow{display:grid;grid-template-columns:minmax(0,1fr) auto 150px;gap:8px;align-items:center}
+.gprow select{width:100%}
 details.help{margin-top:12px;padding:10px 14px}
 .selcard{margin-top:12px;padding:12px 16px}
 .sel-h{font-size:13px;color:var(--muted);margin-bottom:8px}
@@ -773,6 +784,20 @@ function pick(A, sel) {
   const it = A.items.find(i => i.key === sel);
   return it ? it.res : evalWorkout(A.parsed, sel, A.W);
 }
+/* "Totals for <group>": a practice counts only if that group takes part – directly, or through its sub-groups
+   (then the median of the sub-groups is used). Anything else is shown but not counted. Median / Largest are unchanged. */
+function pickFor(A, sel, parentOf) {
+  if (!sel || sel === 'median' || sel === 'max') return { res: pick(A, sel), counted: true, via: null };
+  const own = A.hasGroups ? A.items.find(i => i.key === sel) : null;
+  if (own) return { res: own.res, counted: true, via: 'group' };
+  const subs = A.hasGroups && parentOf ? A.items.filter(i => i.key !== sel && parentOf(i.key) === sel) : [];
+  if (subs.length) {
+    const my = median(subs.map(i => i.res.yds)), ms = median(subs.map(i => i.res.secs));
+    const near = subs.reduce((b, i) => Math.abs(i.res.yds - my) < Math.abs(b.res.yds - my) ? i : b, subs[0]);
+    return { res: Object.assign({}, near.res, { yds: my, secs: ms, end: A.W.startSec + ms }), counted: true, via: 'sub', subs: subs.map(i => i.name) };
+  }
+  return { res: pick(A, 'median'), counted: false, via: null };
+}
 function groupNamesIn(text) {
   const out = []; const re = /^\s*#(.*)$/gm; let m;
   while ((m = re.exec(text || ''))) m[1].split(/[,#]/).map(s => s.trim()).filter(Boolean).forEach(n => {
@@ -866,7 +891,7 @@ function paceTable(per100, extra, rest) {
 /*CORE-END*/
 
 /* ---------- storage ---------- */
-const BUILD = 'Pool Deck build 2026-11-16b (reference library, JJ parsing, safer storage)';
+const BUILD = 'Pool Deck build 2026-11-16c (group totals fix, event sub-groups)';
 const KEY = 'pooldeck.v1';
 const defSettings = () => ({ v: 3, weekStart: 1, defSec: 90, unit: 'yards', pool: 25, startTime: '15:30', seeded: false, weekGroup: 'median',
   groupList: ['100s', '200Free', '200im', '500free', '50Free', '50and100free', 'Alternates', 'Autos', 'Metro', 'NonAutos', 'State', 'Varsity'],
@@ -914,6 +939,9 @@ const allWorkouts = () => Object.values(db.workouts);
 const hasWeights = w => !!(w.weights || '').trim();
 const hasSwim = w => !!(w.text || '').trim();
 const dispTitle = w => w.title || (hasWeights(w) && !hasSwim(w) ? 'Weight room' : 'Untitled practice');
+function groupParentMap() {   // optional settings.groupParent = { "50-100": "state", ... }  (group key -> parent group key)
+  const m = {}; Object.entries(db.settings.groupParent || {}).forEach(([k, v]) => { if (k && v) m[String(k).toLowerCase()] = String(v).toLowerCase(); }); return m;
+}
 const calWorkouts = () => allWorkouts().filter(w => !isRefWorkout(w));   // reference practices (JJ, SwimSwam, photos) stay off the calendar
 function workoutsOn(date) {
   return calWorkouts().filter(w => w.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || '') || (a.created || 0) - (b.created || 0));
@@ -1020,16 +1048,18 @@ function route() {
 function renderWeek(ws) {
   const S = db.settings, sel = S.weekGroup || 'median', ua = unitAbbr(S.unit);
   const days = [...Array(7)].map((_, i) => addDays(ws, i));
+  const gpm = groupParentMap(), parentOf = k => gpm[k] || '';
   const data = days.map(d => {
-    const items = workoutsOn(d).map(w => { const A = analyze(w); return { w, A, r: pick(A, sel) }; });
-    return { date: d, items, yds: items.reduce((a, x) => a + x.r.yds, 0), secs: items.reduce((a, x) => a + x.r.secs, 0) };
+    const items = workoutsOn(d).map(w => { const A = analyze(w), pk = pickFor(A, sel, parentOf); return { w, A, r: pk.res, counted: pk.counted, via: pk.via, subs: pk.subs }; });
+    const cs = items.filter(x => x.counted);
+    return { date: d, items, yds: cs.reduce((a, x) => a + x.r.yds, 0), secs: cs.reduce((a, x) => a + x.r.secs, 0) };
   });
   const wYds = data.reduce((a, d) => a + d.yds, 0), wSecs = data.reduce((a, d) => a + d.secs, 0);
-  const count = data.reduce((a, d) => a + d.items.length, 0);
-  const stats = sumStats(data.flatMap(d => d.items.map(x => x.r.stats)));
+  const allCount = data.reduce((a, d) => a + d.items.length, 0), count = data.reduce((a, d) => a + d.items.filter(x => x.counted).length, 0);
+  const stats = sumStats(data.flatMap(d => d.items.filter(x => x.counted).map(x => x.r.stats)));
   const mDate = pdate(ws);
   const monthYds = calWorkouts().filter(w => { const d = pdate(w.date); return d.getMonth() === mDate.getMonth() && d.getFullYear() === mDate.getFullYear(); })
-    .reduce((a, w) => a + pick(analyze(w), sel).yds, 0);
+    .reduce((a, w) => { const pk = pickFor(analyze(w), sel, parentOf); return a + (pk.counted ? pk.res.yds : 0); }, 0);
   const a = pdate(ws), b = pdate(addDays(ws, 6));
   const range = a.getMonth() === b.getMonth() ? `${MON[a.getMonth()]} ${a.getDate()} – ${b.getDate()}` : `${MON[a.getMonth()]} ${a.getDate()} – ${MON[b.getMonth()]} ${b.getDate()}`;
   const groups = allGroups();
@@ -1046,7 +1076,7 @@ function renderWeek(ws) {
     <span class="sp"></span>
     ${groups.length ? `<label class="f" style="flex-direction:row;align-items:center;gap:8px">Totals for
       <select id="wkgroup"><option value="median"${sel === 'median' ? ' selected' : ''}>Median of groups</option><option value="max"${sel === 'max' ? ' selected' : ''}>Largest group</option>${groups.map(g => `<option value="${esc(g.key)}"${g.key === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>` : ''}
-    <button class="btn" data-act="copyweek"${count ? '' : ' disabled'}>Copy week to next week</button>
+    <button class="btn" data-act="copyweek"${allCount ? '' : ' disabled'}>Copy week to next week</button>
   </div>
   <div class="two">
     <div>
@@ -1055,8 +1085,8 @@ function renderWeek(ws) {
         <div class="dh"><b>${DOW[pdate(d.date).getDay()]}</b><span class="muted">${MON[pdate(d.date).getMonth()]} ${pdate(d.date).getDate()}</span></div>
         <div class="db">
           ${d.items.length ? d.items.map(x => `
-            <button class="prac" data-act="open" data-id="${x.w.id}">
-              <span class="pt"><span>${fmtClock(timeToSec(x.w.time))}</span>${esc(dispTitle(x.w))}${hasWeights(x.w) ? '<i class="wtag">Weights</i>' : ''}</span>
+            <button class="prac${x.counted ? '' : ' off'}" data-act="open" data-id="${x.w.id}">
+              <span class="pt"><span>${fmtClock(timeToSec(x.w.time))}</span>${esc(dispTitle(x.w))}${hasWeights(x.w) ? '<i class="wtag">Weights</i>' : ''}${!x.counted ? `<i class="notin">not in ${esc(selName || sel)}</i>` : x.via === 'sub' ? `<i class="wtag" title="${esc(x.subs.join(', '))}">median of ${x.subs.length} sub-groups</i>` : ''}</span>
               <span class="py">${x.r.yds || !hasWeights(x.w) ? fmtNum(Math.round(x.r.yds)) : '<small class="muted" style="font:500 15px var(--f-ui)">weights only</small>'}</span>
               ${x.A.hasGroups ? `<span class="pc">${x.A.items.map(it => `<span class="chip" style="--gc:${colorFor(it.name)}">${esc(it.name)} ${fmtNum(it.res.yds)}</span>`).join('')}</span>` : ''}
             </button>`).join('') : '<div class="restday">No practice</div>'}
@@ -1069,7 +1099,8 @@ function renderWeek(ws) {
       <div class="card sp-card">
         <h3>Week total${selName ? ' · ' + esc(selName) : ''}</h3>
         <div class="big">${fmtNum(Math.round(wYds))}<small>${ua}</small></div>
-        <div class="kv"><div><b>${fmtDur(wSecs)}</b><span>in the water (est.)</span></div><div><b>${count}</b><span>${count === 1 ? 'practice' : 'practices'}</span></div><div><b>${fmtNum(Math.round(monthYds))}</b><span>${MONL[mDate.getMonth()]} total</span></div></div>
+        <div class="kv"><div><b>${fmtDur(wSecs)}</b><span>in the water (est.)</span></div><div><b>${count}</b><span>${count === 1 ? 'practice' : 'practices'}${allCount > count ? ' counted' : ''}</span></div><div><b>${fmtNum(Math.round(monthYds))}</b><span>${MONL[mDate.getMonth()]} total</span></div></div>
+        ${allCount > count ? `<p class="grp-note" style="margin:10px 0 0">${allCount - count} ${allCount - count === 1 ? 'practice' : 'practices'} not in ${esc(selName || sel)} ${allCount - count === 1 ? 'is' : 'are'} shown muted and not counted.</p>` : ''}
       </div>
       <div class="card sp-card"><h3>${S.unit === 'meters' ? 'Meters' : 'Yards'} by day</h3>
         <div class="cols">${data.map(d => `<div class="col"><div class="cv">${d.yds ? fmtNum(d.yds) : ''}</div><div class="cb"><i style="height:${(d.yds / maxY * 100).toFixed(1)}%"></i></div><div class="cl">${DOW[pdate(d.date).getDay()]}</div></div>`).join('')}</div>
@@ -1087,7 +1118,7 @@ function renderWeek(ws) {
     else if (act === 'open') go('#/edit/' + b.dataset.id);
     else if (act === 'add') { const w = newWorkout(b.dataset.date); go('#/edit/' + w.id); }
     else if (act === 'addwr') { const w = newWorkout(b.dataset.date); state.wantWeights = true; go('#/edit/' + w.id); }
-    else if (act === 'copyweek') copyWeek(ws, count);
+    else if (act === 'copyweek') copyWeek(ws, allCount);
   };
   const g = document.getElementById('wkgroup');
   if (g) g.onchange = () => { db.settings.weekGroup = g.value; saveDB(); renderWeek(ws); };
@@ -2045,6 +2076,12 @@ function settingsDialog() {
     </div>
     <p class="muted" style="margin:0;font-size:14px">These apply to new practices. Existing practices keep their own values.</p>
     <label class="f">Your groups (one per line or comma separated)<textarea id="s-groups" rows="3">${esc((s.groupList || []).join(', '))}</textarea></label>
+    ${(() => {
+      const gpm = groupParentMap(), names = knownGroups(Object.keys(gpm).concat(Object.values(gpm))).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+      return `<details class="gpbox" open><summary>Event groups – groups that are part of a bigger group</summary>
+        <p class="muted" style="margin:6px 0 8px;font-size:14px">For example, if 50-100 and 200-500 are part of State, choose State next to each. When you view totals for State, a practice that only has those event groups counts the median of them.</p>
+        <div class="gplist">${names.map(n => { const k = n.toLowerCase(), cur = gpm[k] || ''; return `<label class="gprow"><span>${esc(n)}</span><span class="muted">part of</span><select class="gp-sel" data-k="${esc(k)}"><option value="">– none –</option>${names.filter(o => o.toLowerCase() !== k && gpm[o.toLowerCase()] !== k).map(o => `<option value="${esc(o.toLowerCase())}"${cur === o.toLowerCase() ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`; }).join('')}</div></details>`;
+    })()}
     <hr>
     <h2 style="font-size:22px">Google Drive</h2>
     <p style="margin:0;font-size:15px">PDFs are saved into one folder in your Drive. The app can only see files it creates itself, not the rest of your Drive.</p>
@@ -2078,6 +2115,12 @@ function settingsDialog() {
       if (db.settings.gClientId) loadScript(GSI).catch(() => {});
       saveDB();
     };
+    d.querySelectorAll('.gp-sel').forEach(sel => sel.onchange = () => {
+      const gp = db.settings.groupParent || (db.settings.groupParent = {});
+      if (sel.value) gp[sel.dataset.k] = sel.value; else delete gp[sel.dataset.k];
+      if (!Object.keys(gp).length) delete db.settings.groupParent;
+      saveSoon();
+    });
     q('#s-done').onclick = () => { saveFields(); closeDlg(); route(); };
     q('#s-test').onclick = async () => {
       saveFields(); msg.textContent = 'Opening Google sign-in…';
