@@ -296,6 +296,9 @@ dialog::backdrop{background:rgba(8,18,26,.55)}
   .pp .l{white-space:pre-wrap;overflow-wrap:break-word;min-height:1.2em}
   .pp .gap{height:.9em}
   .pp .rt{text-align:right;font-size:9.5pt;color:#555;margin:2px 0 8px}
+  .pp .rt+.rt{margin-top:-6px}
+  .pp .rt i{font-style:normal;font-weight:600}
+  .pp .tag.sec{margin:4px 0 4px}
   .pp .tot{margin-top:22px;text-align:right;font-weight:600;border-top:1px solid #999;padding-top:6px}
 }
 </style>
@@ -891,7 +894,7 @@ function paceTable(per100, extra, rest) {
 /*CORE-END*/
 
 /* ---------- storage ---------- */
-const BUILD = 'Pool Deck build 2026-11-16c (group totals fix, event sub-groups)';
+const BUILD = 'Pool Deck build 2026-11-18 (print groups together or separately)';
 const KEY = 'pooldeck.v1';
 const defSettings = () => ({ v: 3, weekStart: 1, defSec: 90, unit: 'yards', pool: 25, startTime: '15:30', seeded: false, weekGroup: 'median',
   groupList: ['100s', '200Free', '200im', '500free', '50Free', '50and100free', 'Alternates', 'Autos', 'Metro', 'NonAutos', 'State', 'Varsity'],
@@ -1452,6 +1455,60 @@ function groupPickDialog(w, done) {
 /* ---------- PDF (jsPDF) ---------- */
 const pdfSafe = t => String(t).replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...').replace(/[•·]/g, '*').replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
 const fmtElapsed = sec => { const m = Math.floor(sec / 60); return `${Math.floor(m / 60)}:${pad(m % 60)}`; };
+/* Pages for the PDF and for Print.
+   keys: group keys to include (null = every group). combine: all chosen groups on one workout, shared sets written once
+   and each group's own sets under its #tag; otherwise one page per group (groups that swim exactly the same thing share one page, like Commit). */
+function printPages(A, keys, combine) {
+  let items = A.items.filter(it => !keys || it.key === '*' || keys.includes(it.key));
+  if (!items.length) items = A.items;
+  const indOf = L => Math.max(0, L.indent - (L.base != null ? L.base : 0));
+  const same = (a, b) => Math.round(a.y) === Math.round(b.y) && Math.round(a.s) === Math.round(b.s);
+  const totsOf = list => {
+    const out = [];
+    list.forEach(it => { const ex = out.find(t => same({ y: t.res.yds, s: t.res.secs }, { y: it.res.yds, s: it.res.secs })); if (ex) { if (it.name) ex.tags.push(it.name); } else out.push({ tags: it.name ? [it.name] : [], res: it.res }); });
+    return out;
+  };
+  if (combine && A.hasGroups && items.length > 1) {
+    const lines = []; let gap = false, inSec = false;
+    const brk = () => { if (lines.length) lines.push({ gap: true }); gap = false; };
+    A.parsed.forEach((L, i) => {
+      if (L.kind === 'group') {
+        if (!L.groups) { if (inSec) { brk(); lines.push({ hdr: 'All groups' }); } inSec = false; return; }
+        const names = items.filter(it => L.groups.some(n => n.toLowerCase() === it.key)).map(it => it.name);
+        if (!names.length) return;
+        brk(); lines.push({ hdr: names.map(n => '#' + n).join('  ') }); inSec = true; return;
+      }
+      const on = items.filter(it => { const p = it.res.per[i]; return p && p.applies; });
+      if (!on.length) return;
+      if (L.kind === 'blank') { gap = lines.length > 0; return; }
+      if (gap) { lines.push({ gap: true }); gap = false; }
+      const rt = [];
+      on.forEach(it => {
+        const p = it.res.per[i]; if (!p.showTotal) return;
+        const r = { y: p.cumY, s: p.cumS }, ex = rt.find(x => same(x, r));
+        if (ex) ex.tags.push(it.name); else rt.push(Object.assign(r, { tags: [it.name] }));
+      });
+      const plain = rt.length === 1 && rt[0].tags.length === items.length;   // every group is at the same spot – no label needed
+      lines.push({ text: L.text, ind: indOf(L) + (L.section ? 2 : 0), rt: rt.length ? rt.map(r => ({ lab: plain ? '' : r.tags.join(', '), y: r.y, s: r.s })) : null });
+    });
+    return [{ combined: true, tags: items.map(it => it.name), lines, tots: totsOf(items) }];
+  }
+  const pages = [];
+  items.forEach(it => {
+    const lines = []; let gap = false;
+    A.parsed.forEach((L, i) => {
+      const p = it.res.per[i]; if (!p || !p.applies || L.kind === 'group') return;
+      if (L.kind === 'blank') { gap = lines.length > 0; return; }
+      if (gap) { lines.push({ gap: true }); gap = false; }
+      lines.push({ text: L.text, ind: indOf(L), rt: p.showTotal ? [{ lab: '', y: p.cumY, s: p.cumS }] : null });
+    });
+    const sig = JSON.stringify([lines, Math.round(it.res.yds), Math.round(it.res.secs)]);
+    const ex = pages.find(g => g.sig === sig);
+    if (ex) { if (it.name) ex.tags.push(it.name); } else pages.push({ sig, tags: it.name ? [it.name] : [], lines, res: it.res });
+  });
+  pages.forEach(pg => { pg.tots = [{ tags: pg.tags, res: pg.res }]; });
+  return pages;
+}
 function buildPdf(w, opt) {
   if (!(window.jspdf && window.jspdf.jsPDF)) throw new Error('NOPDF');
   const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
@@ -1459,21 +1516,9 @@ function buildPdf(w, opt) {
   const PW = 612, PH = 792, M = 54, LH = 15, RW = opt.metrics ? 118 : 0, FS = 11;
   const what = opt.what || 'swim';
   if (what === 'weights' && !hasWeights(w)) throw new Error('NOWEIGHTS');
-  /* groups that swim exactly the same thing share one page, like Commit */
-  const pages = [];
-  A.items.forEach(it => {
-    const lines = []; let gap = false;
-    A.parsed.forEach((L, i) => {
-      const p = it.res.per[i]; if (!p || !p.applies || L.kind === 'group') return;
-      if (L.kind === 'blank') { gap = lines.length > 0; return; }
-      if (gap) { lines.push({ gap: true }); gap = false; }
-      lines.push({ text: L.text, ind: Math.max(0, L.indent - (L.base != null ? L.base : 0)), total: p.showTotal ? { y: p.cumY, s: p.cumS } : null });
-    });
-    const sig = JSON.stringify([lines, Math.round(it.res.yds), Math.round(it.res.secs)]);
-    const ex = pages.find(g => g.sig === sig);
-    if (ex) { if (it.name) ex.tags.push(it.name); } else pages.push({ sig, tags: it.name ? [it.name] : [], lines, res: it.res });
-  });
+  const pages = printPages(A, opt.groups, opt.combine);
   const when = sec => opt.zero ? fmtElapsed(sec) : fmtClock(A.W.startSec + sec);
+  const rtText = r => `${r.lab ? r.lab + '  ' : ''}${fmtNum(r.y)} ${ua} ${when(r.s)}`;
   const drawPages = what === 'weights' ? [] : pages;
   drawPages.forEach((pg, pi) => {
     if (pi) doc.addPage();
@@ -1486,25 +1531,37 @@ function buildPdf(w, opt) {
     doc.text(`Default interval: ${fmtMS(w.defSec || 90)} per 100`, PW / 2, y, { align: 'center' }); y += 8;
     doc.setDrawColor(150); doc.line(M, y, PW - M, y); y += 20;
     doc.setTextColor(0);
-    if (pg.tags.length) { doc.setFont('helvetica', 'bold'); doc.setFontSize(FS); doc.text(pdfSafe(pg.tags.map(t => '#' + t).join(' ') + ' sets'), M, y); y += LH + 6; doc.setFont('helvetica', 'normal'); }
+    if (pg.tags.length) { doc.setFont('helvetica', 'bold'); doc.setFontSize(FS); doc.text(pdfSafe(pg.combined ? 'Groups: ' + pg.tags.join(', ') : pg.tags.map(t => '#' + t).join(' ') + ' sets'), M, y); y += LH + 6; doc.setFont('helvetica', 'normal'); }
     doc.setFontSize(FS);
     if (opt.metrics) { doc.setFontSize(8.5); doc.setTextColor(110); doc.text(`0 ${ua} ${when(0)}`, PW - M, y - 4, { align: 'right' }); doc.setTextColor(0); doc.setFontSize(FS); }
     pg.lines.forEach(l => {
       if (l.gap) { y += 7; return; }
+      if (l.hdr) {
+        if (y + LH > PH - M - 50) { doc.addPage(); y = M; }
+        doc.setFont('helvetica', 'bold'); doc.text(pdfSafe(l.hdr), M, y); doc.setFont('helvetica', 'normal'); y += LH + 2; return;
+      }
       const indent = l.ind * 7;
+      const rt = opt.metrics && l.rt ? l.rt : [];
       const wrapped = doc.splitTextToSize(pdfSafe(l.text), PW - 2 * M - indent - RW);
-      if (y + wrapped.length * LH > PH - M - 50) { doc.addPage(); y = M; }
+      if (y + wrapped.length * LH + rt.length * 10.5 > PH - M - 50) { doc.addPage(); y = M; }
       wrapped.forEach((ln, k) => { doc.text(ln, M + indent, y + k * LH); });
       const last = y + (wrapped.length - 1) * LH;
-      if (opt.metrics && l.total) { doc.setFontSize(8.5); doc.setTextColor(110); doc.text(`${fmtNum(l.total.y)} ${ua} ${when(l.total.s)}`, PW - M, last + 12, { align: 'right' }); doc.setTextColor(0); doc.setFontSize(FS); y += 8; }
+      if (rt.length) {
+        doc.setFontSize(8.5); doc.setTextColor(110);
+        rt.forEach((r, k) => doc.text(pdfSafe(rtText(r)), PW - M, last + 12 + k * 10.5, { align: 'right' }));
+        doc.setTextColor(0); doc.setFontSize(FS); y += 8 + (rt.length - 1) * 10.5;
+      }
       y += wrapped.length * LH;
     });
     y += 14;
-    if (y > PH - M - 40) { doc.addPage(); y = M; }
+    if (y + pg.tots.length * (LH + 3) > PH - M - 20) { doc.addPage(); y = M; }
     doc.setDrawColor(150); doc.line(M, y, PW - M, y); y += 16;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(FS);
-    const tl = pg.tags.length ? pg.tags.map(t => '#' + t).join(' ') + ' totals: ' : 'Totals: ';
-    doc.text(pdfSafe(`${tl}${fmtNum(pg.res.yds)} ${unitWord(w.unit)} - ${fmtClock(pg.res.end)} (${fmtDurClock(A.W.startSec, pg.res.end)})`), PW - M, y, { align: 'right' });
+    pg.tots.forEach((t, k) => {
+      if (k) y += LH + 3;
+      const tl = t.tags.length ? t.tags.map(x => '#' + x).join(' ') + ' totals: ' : 'Totals: ';
+      doc.text(pdfSafe(`${tl}${fmtNum(t.res.yds)} ${unitWord(w.unit)} - ${fmtClock(t.res.end)} (${fmtDurClock(A.W.startSec, t.res.end)})`), PW - M, y, { align: 'right' });
+    });
     doc.setFont('helvetica', 'normal');
     if (opt.notes && (w.notes || '').trim() && pi === drawPages.length - 1) {
       y += 28; doc.setFont('helvetica', 'bold'); doc.text('Notes', M, y); doc.setFont('helvetica', 'normal'); y += LH;
@@ -1597,6 +1654,7 @@ const pdfErrMsg = e => e && e.message === 'NOPDF' ? 'The PDF tool did not load (
 function printDialog(w, preset) {
   const o = db.settings.pdfOpts, hw = hasWeights(w), hs = hasSwim(w);
   const what0 = preset === 'weights' && hw ? 'weights' : (hw && !hs ? 'weights' : (hw ? 'both' : 'swim'));
+  const A = analyze(w), multi = A.hasGroups && A.items.length > 1;
   dialog(`<h2>Save, share or print</h2>
     <div class="row"><span class="muted">Include</span>
       <label class="chk"><input type="radio" name="o-w" value="swim"${what0 === 'swim' ? ' checked' : ''}${hs || !hw ? '' : ' disabled'}> Swim practice</label>
@@ -1605,27 +1663,47 @@ function printDialog(w, preset) {
     <label class="chk"><input type="checkbox" id="o-m"${o.metrics ? ' checked' : ''}> Show running yards and time down the side</label>
     <div class="row"><label class="chk"><input type="radio" name="o-t" value="clock"${o.zero ? '' : ' checked'}> Clock time</label><label class="chk"><input type="radio" name="o-t" value="zero"${o.zero ? ' checked' : ''}> Start at 0:00</label></div>
     <label class="chk"><input type="checkbox" id="o-n"${o.notes ? ' checked' : ''}> Include notes</label>
-    <p class="muted" style="margin:0;font-size:14px">Groups that swim exactly the same sets share a page; each different set gets its own page.</p>
+    ${multi ? `<hr><div><div class="muted" style="font-size:14px;margin-bottom:6px">Groups to include</div>
+      <div class="cbs" id="o-gs">${A.items.map(it => `<label class="chk"><input type="checkbox" value="${esc(it.key)}" checked> <span class="chip" style="--gc:${colorFor(it.name)}">${esc(it.name)}</span></label>`).join('')}</div></div>
+    <div class="row"><span class="muted">Layout</span>
+      <label class="chk"><input type="radio" name="o-c" value="one"${o.combine ? ' checked' : ''}> One workout with all checked groups</label>
+      <label class="chk"><input type="radio" name="o-c" value="sep"${o.combine ? '' : ' checked'}> Each group on its own page</label></div>` : ''}
+    <p class="muted" style="margin:0;font-size:14px" id="o-hint"></p>
     <div class="row"><button class="btn primary" id="o-dl" type="button">Download PDF</button><button class="btn" id="o-dr" type="button">Save to Google Drive</button>${canShareFiles ? '<button class="btn" id="o-sh" type="button">Share…</button>' : ''}<button class="btn" id="o-pr" type="button">Print…</button></div>
     <p class="msg" id="o-msg" role="status"></p>
     <div class="foot"><button class="btn" id="o-x" type="button">Close</button></div>`, d => {
     const msg = d.querySelector('#o-msg');
+    const hint = d.querySelector('#o-hint');
+    const chosen = () => multi ? [...d.querySelectorAll('#o-gs input:checked')].map(x => x.value) : null;
+    const isOne = () => multi && d.querySelector('input[name=o-c]:checked').value === 'one';
+    const setHint = () => {
+      const n = multi ? chosen().length : 0;
+      hint.textContent = !multi ? '' : !n ? 'Check at least one group.'
+        : isOne() && n > 1 ? 'Sets everyone swims are written once; each group’s own sets appear under its #tag, with a total for each group at the bottom.'
+        : 'Groups that swim exactly the same sets share a page; each different set gets its own page.';
+    };
+    if (multi) d.querySelectorAll('#o-gs input, input[name=o-c]').forEach(x => x.onchange = setHint);
+    setHint();
     const opts = () => {
-      const v = { metrics: d.querySelector('#o-m').checked, zero: d.querySelector('input[name=o-t]:checked').value === 'zero', notes: d.querySelector('#o-n').checked };
+      const v = { metrics: d.querySelector('#o-m').checked, zero: d.querySelector('input[name=o-t]:checked').value === 'zero', notes: d.querySelector('#o-n').checked, combine: multi ? isOne() : !!o.combine };
       db.settings.pdfOpts = v; saveSoon();
-      const pick_ = d.querySelector('input[name=o-w]:checked');
-      return Object.assign({ what: pick_ ? pick_.value : 'swim' }, v);
+      const pick_ = d.querySelector('input[name=o-w]:checked'), what = pick_ ? pick_.value : 'swim';
+      const groups = chosen();
+      if (groups && !groups.length && what !== 'weights') { msg.textContent = 'Check at least one group to include.'; return null; }
+      return Object.assign({ what, groups, combine: v.combine }, v);
     };
     d.querySelector('#o-x').onclick = closeDlg;
-    d.querySelector('#o-pr').onclick = () => { const op = opts(); closeDlg(); printWorkout(w, op.what); };
-    d.querySelector('#o-dl').onclick = () => { try { const r = buildPdf(w, opts()); r.doc.save(r.name); msg.textContent = 'Downloaded ' + r.name; } catch (e) { msg.textContent = pdfErrMsg(e); } };
+    d.querySelector('#o-pr').onclick = () => { const op = opts(); if (!op) return; closeDlg(); printWorkout(w, op); };
+    d.querySelector('#o-dl').onclick = () => { if (!opts()) return; try { const r = buildPdf(w, opts()); r.doc.save(r.name); msg.textContent = 'Downloaded ' + r.name; } catch (e) { msg.textContent = pdfErrMsg(e); } };
     const sh = d.querySelector('#o-sh');
     if (sh) sh.onclick = async () => {
+      if (!opts()) return;
       try { const r = buildPdf(w, opts()); await navigator.share({ files: [new File([r.blob], r.name, { type: 'application/pdf' })], title: r.name }); msg.textContent = 'Shared.'; }
       catch (e) { if (e && e.name === 'AbortError') return; msg.textContent = pdfErrMsg(e); }
     };
     d.querySelector('#o-dr').onclick = async () => {
       let r;
+      if (!opts()) return;
       try { r = buildPdf(w, opts()); } catch (e) { msg.textContent = pdfErrMsg(e); return; }
       msg.textContent = 'Saving to Google Drive…';
       try {
@@ -1636,21 +1714,24 @@ function printDialog(w, preset) {
   });
 }
 /* ---------- print ---------- */
-function printWorkout(w, what) {
-  what = what || 'swim';
+function printWorkout(w, op) {
+  op = typeof op === 'string' || !op ? { what: op || 'swim' } : op;
+  const what = op.what || 'swim';
   const A = analyze(w), ua = unitAbbr(w.unit);
-  const pages = (what === 'weights' ? [] : A.items).map(it => {
-    const per = it.res.per; let body = '';
-    A.parsed.forEach((L, i) => {
-      const p = per[i]; if (!p || !p.applies || L.kind === 'group') return;
-      if (L.kind === 'blank') { body += '<div class="gap"></div>'; return; }
-      body += `<div class="l" style="padding-left:${Math.max(0, L.indent - (L.base != null ? L.base : 0)) * 0.5}em">${esc(L.text)}</div>`;
-      if (p.showTotal) body += `<div class="rt">${fmtNum(p.cumY)} ${ua} ${fmtClock(A.W.startSec + p.cumS)}</div>`;
+  const pages = (what === 'weights' ? [] : printPages(A, op.groups, op.combine)).map(pg => {
+    let body = '';
+    pg.lines.forEach(l => {
+      if (l.gap) { body += '<div class="gap"></div>'; return; }
+      if (l.hdr) { body += `<div class="tag sec">${esc(l.hdr)}</div>`; return; }
+      body += `<div class="l" style="padding-left:${l.ind * 0.5}em">${esc(l.text)}</div>`;
+      if (l.rt) body += l.rt.map(r => `<div class="rt">${r.lab ? `<i>${esc(r.lab)}</i> ` : ''}${fmtNum(r.y)} ${ua} ${fmtClock(A.W.startSec + r.s)}</div>`).join('');
     });
-    const tag = it.name ? `#${esc(it.name)}` : '';
+    const tags = pg.tags.map(t => '#' + esc(t)).join(' ');
+    const head = !pg.tags.length ? '' : pg.combined ? `Groups: ${pg.tags.map(esc).join(', ')}` : tags;
+    const tots = pg.tots.map(t => `<div>${t.tags.length ? t.tags.map(x => '#' + esc(x)).join(' ') + ' totals: ' : ''}${fmtNum(t.res.yds)} ${unitWord(w.unit)} - ${fmtClock(t.res.end)} (${fmtDurClock(A.W.startSec, t.res.end)})</div>`).join('');
     return `<div class="pp"><div class="h"><b>${esc(w.title || 'Practice')}</b><span>${fmtLong(w.date)} - ${fmtClock(A.W.startSec)} ${w.pool || 25} ${unitWord(w.unit)}</span><small>Default interval: ${fmtMS(w.defSec || 90)} per 100</small></div>
-      ${tag ? `<div class="tag">${tag}</div>` : ''}${body}
-      <div class="tot">${tag ? tag + ' totals: ' : ''}${fmtNum(it.res.yds)} ${unitWord(w.unit)} - ${fmtClock(it.res.end)} (${fmtDurClock(A.W.startSec, it.res.end)})</div></div>`;
+      ${head ? `<div class="tag">${head}</div>` : ''}${body}
+      <div class="tot">${tots}</div></div>`;
   });
   if (what !== 'swim' && hasWeights(w)) pages.push(`<div class="pp"><div class="h"><b>${esc(w.title || 'Weight room')}</b><span>${fmtLong(w.date)} - ${fmtClock(A.W.startSec)}</span></div><div class="tag">Weight room / dryland</div><div class="l" style="white-space:pre-wrap">${esc(w.weights)}</div></div>`);
   document.getElementById('printRoot').innerHTML = pages.join('');
